@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Football Coach</title>
+<style>
+body { font-family: Arial; padding: 15px; }
+input, button { width: 100%; padding: 12px; margin: 6px 0; font-size: 16px; }
+.big { font-size: 26px; text-align: center; margin: 15px 0; }
+.box { border:1px solid #ddd; padding:10px; margin-bottom:10px; border-radius:8px; }
+</style>
+</head>
+
+<body>
+
+<h2>⚽ Coach App</h2>
+
+<div class="box">
+<label>Match length (mins)</label>
+<input id="match" type="number" value="40">
+
+<label>Sub interval (mins)</label>
+<input id="interval" type="number" value="5">
+
+<button onclick="start()">Start Match</button>
+<button onclick="reset()">Reset</button>
+</div>
+
+<div class="big" id="clock">00:00</div>
+<div id="info"></div>
+
+<script>
+let sec = 0;
+let timer;
+let intervalSec = 300;
+
+function start(){
+  sec = 0;
+  clearInterval(timer);
+
+  let mins = document.getElementById("interval").value;
+  intervalSec = mins * 60;
+
+  timer = setInterval(()=>{
+    sec++;
+
+    let m = Math.floor(sec/60).toString().padStart(2,'0');
+    let s = (sec%60).toString().padStart(2,'0');
+    document.getElementById("clock").innerText = m+":"+s;
+
+    if(sec % intervalSec === 0){
+      alert("⚽ SUB TIME");
+      if(navigator.vibrate) navigator.vibrate(300);
+    }
+
+  },1000);
+
+  document.getElementById("info").innerText =
+    "GK1 first half, GK2 second half. Rotate evenly.";
+}
+
+function reset(){
+  clearInterval(timer);
+  sec = 0;
+  document.getElementById("clock").innerText = "00:00";
+}
+</script>
+
+</body>
+</html>
