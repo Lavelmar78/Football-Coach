@@ -2,111 +2,191 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Coach FINAL+</title>
+<title>Coach App</title>
+
 <style>
-body { font-family: Arial; padding: 10px; }
-input, button, select { width:100%; padding:10px; margin:5px 0; }
+body { font-family:-apple-system; margin:0; background:#f5f5f5; }
 
-.player { border:1px solid #ddd; padding:6px; margin-bottom:5px; }
+header {
+  background:#111; color:#fff; padding:12px;
+  text-align:center; font-weight:bold;
+}
 
-.bar {
-  height:10px;
+.tabbar {
+  display:flex;
+  position:fixed;
+  bottom:0;
+  width:100%;
+  background:#fff;
+  border-top:1px solid #ccc;
+}
+
+.tabbar button {
+  flex:1;
+  padding:10px;
+  border:none;
+  background:none;
+}
+
+.tabbar button.active {
+  background:#ddd;
+}
+
+.screen { display:none; padding:10px 10px 70px; }
+.active { display:block; }
+
+.card {
+  background:#fff;
+  padding:10px;
+  margin-bottom:10px;
+  border-radius:8px;
+}
+
+.big { font-size:28px; text-align:center; }
+.highlight {
+  background:#ffeeba;
+  padding:12px;
+  text-align:center;
+  font-size:20px;
+  border-radius:8px;
+}
+
+.player { margin-bottom:6px; }
+
+.barWrap { background:#eee; }
+.bar { height:10px; background:#4CAF50; }
+
+.pitch { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+.zone { height:70px; border:2px dashed #ccc; }
+
+.token {
   background:#4CAF50;
+  color:#fff;
+  padding:4px;
+  font-size:12px;
+  margin:2px;
 }
-
-.barWrap {
-  background:#eee;
-  margin-bottom:5px;
-}
-
-.big { font-size:24px; text-align:center; }
-.highlight { background:#ffeeba; padding:10px; text-align:center; }
 
 </style>
 </head>
 
 <body>
 
-<h2>⚽ Coach FINAL+</h2>
+<header>⚽ Coach App</header>
 
-<label>Format</label>
+<!-- SETUP -->
+<div id="setup" class="screen active">
+<div class="card">
+
 <select id="format" onchange="setFormat()">
+<option value="7">7-a-side</option>
 <option value="5">5-a-side</option>
-<option value="7" selected>7-a-side</option>
 <option value="9">9-a-side</option>
 <option value="11">11-a-side</option>
 </select>
 
-<label>Match (mins)</label>
-<input id="match" value="40">
-
-<label>Interval (mins)</label>
-<input id="interval" value="5">
-
-<label>Squad</label>
+<input id="match" value="40" placeholder="Match mins">
+<input id="interval" value="5" placeholder="Sub interval">
 <input id="count" value="10" onchange="renderPlayers()">
 
 <div id="players"></div>
 
-<h3>🧤 GK</h3>
+<h4>Goalkeepers</h4>
 <select id="gk1"></select>
 <select id="gk2"></select>
 
-<button onclick="generate()">Generate Plan</button>
+<button onclick="saveTeam()">Save</button>
+<button onclick="loadTeam()">Load</button>
 
-<hr>
+<button onclick="generate(); showTab('plan')">Generate Plan</button>
 
-<div class="big" id="clock">00:00</div>
-<div class="highlight" id="next">Press Start</div>
+</div>
+</div>
 
+<!-- PLAN -->
+<div id="plan" class="screen">
+<div class="card">
+<h3>Sub Plan</h3>
+<div id="planTable"></div>
+</div>
+
+<div class="card">
+<h3>Formation</h3>
+<div id="pitch" class="pitch"></div>
+</div>
+</div>
+
+<!-- MATCH -->
+<div id="matchScreen" class="screen">
+
+<div class="card big" id="clock">00:00</div>
+
+<div class="card highlight" id="next">Next sub</div>
+
+<div class="card">
 <button onclick="start()">Start</button>
 <button onclick="pause()">Pause</button>
-<button onclick="reset()">Reset</button>
-<button onclick="nextSub()">Next Sub Done</button>
+<button onclick="nextSub()">Next Sub</button>
+</div>
 
-<h3>📊 Minutes Tracker</h3>
+</div>
+
+<!-- STATS -->
+<div id="stats" class="screen">
+<div class="card">
+<h3>Minutes</h3>
 <div id="minutes"></div>
+</div>
+</div>
+
+<!-- TAB BAR -->
+<div class="tabbar">
+<button onclick="showTab('setup')">Setup</button>
+<button onclick="showTab('plan')">Plan</button>
+<button onclick="showTab('matchScreen')">Match</button>
+<button onclick="showTab('stats')">Stats</button>
+</div>
 
 <script>
 
-let players=[], plan=[], sec=0, timer=null, index=0, onfield=7, current=[];
+let players=[], plan=[], current=[], sec=0, timer=null, index=0, onfield=6;
+
+function showTab(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+}
 
 function setFormat(){
-  let f=+document.getElementById("format").value;
-  onfield=f-1;
+  onfield=document.getElementById("format").value-1;
 }
 
 function renderPlayers(){
-  let n=document.getElementById("count").value;
-  let div=document.getElementById("players");
-  div.innerHTML="<h3>Players</h3>";
-
+  let n=count.value;
+  let html="";
   for(let i=0;i<n;i++){
-    div.innerHTML+=`
+    html+=`
     <div class="player">
       <input id="p${i}" placeholder="Player ${i+1}">
       <label><input type="checkbox" id="s${i}"> Starter</label>
     </div>`;
   }
-
+  players.innerHTML=html;
   updateGK();
 }
 
 function updateGK(){
-  let n=document.getElementById("count").value;
-  let g1=document.getElementById("gk1");
-  let g2=document.getElementById("gk2");
-  g1.innerHTML=""; g2.innerHTML="";
-
+  let n=count.value;
+  let html="";
   for(let i=0;i<n;i++){
     let name=document.getElementById("p"+i)?.value||"P"+(i+1);
-    g1.innerHTML+=`<option value="${i}">${name}</option>`;
-    g2.innerHTML+=`<option value="${i}">${name}</option>`;
+    html+=`<option value="${i}">${name}</option>`;
   }
+  gk1.innerHTML=html;
+  gk2.innerHTML=html;
 }
 
 function getPlayers(){
-  let n=document.getElementById("count").value;
+  let n=count.value;
   let arr=[];
   for(let i=0;i<n;i++){
     arr.push({
@@ -119,57 +199,91 @@ function getPlayers(){
 }
 
 function generate(){
-
-  let match=+document.getElementById("match").value;
-  let interval=+document.getElementById("interval").value;
-
   players=getPlayers();
+  current=players.filter(p=>p.starter);
 
-  let starters=players.filter(p=>p.starter);
-  if(starters.length!==onfield){
-    alert("Starters must match outfield players");
-    return;
+  let match=+match.value;
+  let interval=+interval.value;
+  let slots=Math.floor(match/interval);
+
+  plan=[];
+  for(let i=1;i<slots;i++){
+    plan.push({
+      time:i*interval,
+      off:current[0]?.name,
+      on:players.find(p=>!p.starter)?.name
+    });
   }
 
-  current=[...starters];
-  renderMinutes();
+  buildPlan();
+  buildFormation();
+  index=0;
+  updateNext();
+}
+
+function buildPlan(){
+  let html="<table><tr><th>Time</th><th>Off</th><th>On</th></tr>";
+  plan.forEach(p=>{
+    html+=`<tr><td>${p.time}</td><td>${p.off}</td><td>${p.on}</td></tr>`;
+  });
+  html+="</table>";
+  planTable.innerHTML=html;
+}
+
+function buildFormation(){
+  pitch.innerHTML="";
+  for(let i=0;i<6;i++){
+    pitch.innerHTML+=`<div class="zone"></div>`;
+  }
 }
 
 function start(){
   if(timer) return;
   timer=setInterval(()=>{
     sec++;
-
-    let m=Math.floor(sec/60).toString().padStart(2,'0');
-    let s=(sec%60).toString().padStart(2,'0');
-    document.getElementById("clock").innerText=m+":"+s;
-
-    // add live minutes
+    clock.innerText=format(sec);
     current.forEach(p=>p.minutes+=1/60);
-
     renderMinutes();
-
   },1000);
 }
 
 function pause(){ clearInterval(timer); timer=null; }
-function reset(){ pause(); sec=0; players.forEach(p=>p.minutes=0); renderMinutes(); }
+
+function nextSub(){ index++; updateNext(); }
+
+function updateNext(){
+  if(index>=plan.length){ next.innerText="Done"; return; }
+  let p=plan[index];
+  next.innerText=`${p.off} → ${p.on} @ ${p.time}m`;
+}
 
 function renderMinutes(){
-  let total=+document.getElementById("match").value;
-
+  let total=+match.value;
   let html="";
   players.forEach(p=>{
     let percent=(p.minutes/total)*100;
-    html+=`
-      <div>${p.name} (${p.minutes.toFixed(1)}m)</div>
-      <div class="barWrap">
-        <div class="bar" style="width:${percent}%"></div>
-      </div>
-    `;
+    html+=`${p.name}
+    <div class="barWrap"><div class="bar" style="width:${percent}%"></div></div>`;
   });
+  minutes.innerHTML=html;
+}
 
-  document.getElementById("minutes").innerHTML=html;
+function saveTeam(){
+  localStorage.setItem("team", JSON.stringify(getPlayers()));
+}
+
+function loadTeam(){
+  let data=JSON.parse(localStorage.getItem("team")||"[]");
+  data.forEach((p,i)=>{
+    document.getElementById("p"+i).value=p.name;
+    document.getElementById("s"+i).checked=p.starter;
+  });
+}
+
+function format(s){
+  let m=Math.floor(s/60).toString().padStart(2,'0');
+  let ss=(s%60).toString().padStart(2,'0');
+  return m+":"+ss;
 }
 
 setFormat();
