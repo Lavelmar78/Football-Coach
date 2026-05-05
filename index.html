@@ -2,22 +2,34 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Coach ELITE+</title>
+<title>Coach FINAL+</title>
 <style>
-body { font-family: Arial; padding: 15px; }
-input, button, select { width: 100%; padding: 10px; margin: 5px 0; }
-.player { border:1px solid #ddd; padding:8px; margin-bottom:5px; }
-.small { font-size:12px; }
+body { font-family: Arial; padding: 10px; }
+input, button, select { width:100%; padding:10px; margin:5px 0; }
+
+.player { border:1px solid #ddd; padding:6px; margin-bottom:5px; }
+
+.bar {
+  height:10px;
+  background:#4CAF50;
+}
+
+.barWrap {
+  background:#eee;
+  margin-bottom:5px;
+}
+
 .big { font-size:24px; text-align:center; }
-.highlight { background:#ffeeba; padding:10px; text-align:center; font-size:18px; }
+.highlight { background:#ffeeba; padding:10px; text-align:center; }
+
 </style>
 </head>
 
 <body>
 
-<h2>⚽ Coach ELITE+</h2>
+<h2>⚽ Coach FINAL+</h2>
 
-<label>Game Format</label>
+<label>Format</label>
 <select id="format" onchange="setFormat()">
 <option value="5">5-a-side</option>
 <option value="7" selected>7-a-side</option>
@@ -25,18 +37,18 @@ input, button, select { width: 100%; padding: 10px; margin: 5px 0; }
 <option value="11">11-a-side</option>
 </select>
 
-<label>Match length (mins)</label>
-<input id="match" type="number" value="40">
+<label>Match (mins)</label>
+<input id="match" value="40">
 
-<label>Sub interval (mins)</label>
-<input id="interval" type="number" value="5">
+<label>Interval (mins)</label>
+<input id="interval" value="5">
 
-<label>Squad size</label>
-<input id="count" type="number" value="10" onchange="renderPlayers()">
+<label>Squad</label>
+<input id="count" value="10" onchange="renderPlayers()">
 
 <div id="players"></div>
 
-<h3>🧤 Goalkeepers</h3>
+<h3>🧤 GK</h3>
 <select id="gk1"></select>
 <select id="gk2"></select>
 
@@ -52,13 +64,16 @@ input, button, select { width: 100%; padding: 10px; margin: 5px 0; }
 <button onclick="reset()">Reset</button>
 <button onclick="nextSub()">Next Sub Done</button>
 
+<h3>📊 Minutes Tracker</h3>
+<div id="minutes"></div>
+
 <script>
 
-let players=[], plan=[], sec=0, timer=null, index=0, onfield=7;
+let players=[], plan=[], sec=0, timer=null, index=0, onfield=7, current=[];
 
 function setFormat(){
-  let f = +document.getElementById("format").value;
-  onfield = f - 1; // minus GK
+  let f=+document.getElementById("format").value;
+  onfield=f-1;
 }
 
 function renderPlayers(){
@@ -70,29 +85,23 @@ function renderPlayers(){
     div.innerHTML+=`
     <div class="player">
       <input id="p${i}" placeholder="Player ${i+1}">
-      <div class="small">
-        <label><input type="checkbox" id="def${i}"> DEF</label>
-        <label><input type="checkbox" id="mid${i}"> MID</label>
-        <label><input type="checkbox" id="att${i}"> ATT</label>
-      </div>
       <label><input type="checkbox" id="s${i}"> Starter</label>
     </div>`;
   }
 
-  updateGKDropdowns();
+  updateGK();
 }
 
-function updateGKDropdowns(){
+function updateGK(){
   let n=document.getElementById("count").value;
-  let gk1=document.getElementById("gk1");
-  let gk2=document.getElementById("gk2");
-
-  gk1.innerHTML=""; gk2.innerHTML="";
+  let g1=document.getElementById("gk1");
+  let g2=document.getElementById("gk2");
+  g1.innerHTML=""; g2.innerHTML="";
 
   for(let i=0;i<n;i++){
-    let name=document.getElementById("p"+i)?.value || "P"+(i+1);
-    gk1.innerHTML+=`<option value="${i}">${name}</option>`;
-    gk2.innerHTML+=`<option value="${i}">${name}</option>`;
+    let name=document.getElementById("p"+i)?.value||"P"+(i+1);
+    g1.innerHTML+=`<option value="${i}">${name}</option>`;
+    g2.innerHTML+=`<option value="${i}">${name}</option>`;
   }
 }
 
@@ -103,21 +112,10 @@ function getPlayers(){
     arr.push({
       name:document.getElementById("p"+i).value||"P"+(i+1),
       starter:document.getElementById("s"+i).checked,
-      minutes:0,
-      pos:{
-        def:document.getElementById("def"+i).checked,
-        mid:document.getElementById("mid"+i).checked,
-        att:document.getElementById("att"+i).checked
-      }
+      minutes:0
     });
   }
   return arr;
-}
-
-function samePosition(a,b){
-  return (a.pos.def && b.pos.def) ||
-         (a.pos.mid && b.pos.mid) ||
-         (a.pos.att && b.pos.att);
 }
 
 function generate(){
@@ -127,91 +125,51 @@ function generate(){
 
   players=getPlayers();
 
-  let gk1=+document.getElementById("gk1").value;
-  let gk2=+document.getElementById("gk2").value;
-
-  let slots=Math.floor(match/interval);
-  let half=Math.floor(slots/2);
-
   let starters=players.filter(p=>p.starter);
   if(starters.length!==onfield){
     alert("Starters must match outfield players");
     return;
   }
 
-  let current=[...starters];
-  plan=[];
-
-  for(let i=0;i<slots;i++){
-
-    let activeGK = i<half ? players[gk1] : players[gk2];
-
-    let field=current.filter(p=>p!==activeGK);
-    field.forEach(p=>p.minutes+=interval);
-
-    field.sort((a,b)=>b.minutes-a.minutes);
-    let off=field[0];
-
-    let bench=players.filter(p=>!current.includes(p) && p!==activeGK);
-
-    let samePosBench = bench.filter(p=>samePosition(p, off));
-    samePosBench.sort((a,b)=>a.minutes-b.minutes);
-
-    let on = samePosBench[0] || bench.sort((a,b)=>a.minutes-b.minutes)[0];
-
-    if(off && on){
-      current=current.filter(p=>p!==off);
-      current.push(on);
-    }
-
-    plan.push({
-      time:i*interval,
-      off:off?.name||"-",
-      on:on?.name||"-",
-      gk:activeGK.name
-    });
-  }
-
-  index=0;
-  updateNext();
+  current=[...starters];
+  renderMinutes();
 }
 
 function start(){
   if(timer) return;
   timer=setInterval(()=>{
     sec++;
+
     let m=Math.floor(sec/60).toString().padStart(2,'0');
     let s=(sec%60).toString().padStart(2,'0');
     document.getElementById("clock").innerText=m+":"+s;
-    check();
+
+    // add live minutes
+    current.forEach(p=>p.minutes+=1/60);
+
+    renderMinutes();
+
   },1000);
 }
 
 function pause(){ clearInterval(timer); timer=null; }
-function reset(){ pause(); sec=0; index=0; updateNext(); }
+function reset(){ pause(); sec=0; players.forEach(p=>p.minutes=0); renderMinutes(); }
 
-function check(){
-  if(index>=plan.length) return;
-  let t=plan[index].time*60;
-  if(sec>=t){
-    alert(`GK: ${plan[index].gk}\n${plan[index].off} OFF → ${plan[index].on} ON`);
-    if(navigator.vibrate) navigator.vibrate(300);
-  }
-}
+function renderMinutes(){
+  let total=+document.getElementById("match").value;
 
-function nextSub(){
-  index++;
-  updateNext();
-}
+  let html="";
+  players.forEach(p=>{
+    let percent=(p.minutes/total)*100;
+    html+=`
+      <div>${p.name} (${p.minutes.toFixed(1)}m)</div>
+      <div class="barWrap">
+        <div class="bar" style="width:${percent}%"></div>
+      </div>
+    `;
+  });
 
-function updateNext(){
-  if(index>=plan.length){
-    document.getElementById("next").innerText="Game done";
-    return;
-  }
-  let p=plan[index];
-  document.getElementById("next").innerText=
-    `GK: ${p.gk} | ${p.off} → ${p.on} @ ${p.time}m`;
+  document.getElementById("minutes").innerHTML=html;
 }
 
 setFormat();
