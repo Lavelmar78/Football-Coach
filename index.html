@@ -19,6 +19,8 @@ header { background:#111; color:#fff; padding:12px; text-align:center; }
 
 .card { background:#fff; padding:10px; margin-bottom:10px; border-radius:8px; }
 
+.player { border-bottom:1px solid #eee; padding:6px 0; }
+
 .line {
   border:2px dashed #ccc;
   min-height:70px;
@@ -50,6 +52,7 @@ header { background:#111; color:#fff; padding:12px; text-align:center; }
 <div id="setup" class="screen active">
 <div class="card">
 
+<label>Format</label>
 <select id="format" onchange="setFormat()">
 <option value="7">7-a-side</option>
 <option value="5">5-a-side</option>
@@ -57,6 +60,7 @@ header { background:#111; color:#fff; padding:12px; text-align:center; }
 <option value="11">11-a-side</option>
 </select>
 
+<label>Formation</label>
 <select id="formation">
 <option value="2-3-1">2-3-1</option>
 <option value="3-2-1">3-2-1</option>
@@ -66,11 +70,13 @@ header { background:#111; color:#fff; padding:12px; text-align:center; }
 
 <input id="match" value="40">
 <input id="interval" value="5">
+
+<label>Squad Size</label>
 <input id="count" value="10" onchange="renderPlayers()">
 
 <div id="players"></div>
 
-<h4>GK</h4>
+<h4>Goalkeepers</h4>
 <select id="gk1"></select>
 <select id="gk2"></select>
 
@@ -120,144 +126,146 @@ header { background:#111; color:#fff; padding:12px; text-align:center; }
 
 let players=[], plan=[], current=[], sec=0, timer=null, index=0, onfield=6;
 
+/* NAV */
 function showTab(id){
   document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
   document.getElementById(id).classList.add("active");
 }
 
+/* FORMAT */
 function setFormat(){
   onfield=document.getElementById("format").value-1;
 }
 
+/* RENDER PLAYERS */
 function renderPlayers(){
-  let n=count.value, html="";
+  let n = document.getElementById("count").value;
+  let html = "";
+
   for(let i=0;i<n;i++){
-    html+=`
-    <div>
+    html += `
+    <div class="player">
       <input id="p${i}" placeholder="Player ${i+1}">
-      <label><input type="checkbox" id="s${i}">Starter</label><br>
+      <label><input type="checkbox" id="s${i}"> Starter</label><br>
       <label><input type="checkbox" id="def${i}">DEF</label>
       <label><input type="checkbox" id="mid${i}">MID</label>
       <label><input type="checkbox" id="att${i}">ATT</label>
     </div>`;
   }
-  playersDiv.innerHTML=html;
+
+  document.getElementById("players").innerHTML = html;
   updateGK();
 }
 
+/* GK */
 function updateGK(){
-  let n=count.value, html="";
+  let n = document.getElementById("count").value;
+  let html = "";
+
   for(let i=0;i<n;i++){
-    let name=document.getElementById("p"+i)?.value||"P"+(i+1);
-    html+=`<option value="${i}">${name}</option>`;
+    let name = document.getElementById("p"+i)?.value || "P"+(i+1);
+    html += `<option value="${i}">${name}</option>`;
   }
-  gk1.innerHTML=html;
-  gk2.innerHTML=html;
+
+  document.getElementById("gk1").innerHTML = html;
+  document.getElementById("gk2").innerHTML = html;
 }
 
+/* DATA */
 function getPlayers(){
-  let n=count.value, arr=[];
+  let n = document.getElementById("count").value;
+  let arr = [];
+
   for(let i=0;i<n;i++){
     arr.push({
-      name:p(i),
-      starter:s(i),
-      minutes:0,
-      pos:{def:cb("def",i),mid:cb("mid",i),att:cb("att",i)}
+      name: document.getElementById("p"+i).value || "P"+(i+1),
+      starter: document.getElementById("s"+i).checked,
+      minutes: 0,
+      pos: {
+        def: document.getElementById("def"+i).checked,
+        mid: document.getElementById("mid"+i).checked,
+        att: document.getElementById("att"+i).checked
+      }
     });
   }
+
   return arr;
 }
-
-function p(i){return document.getElementById("p"+i).value||"P"+(i+1);}
-function s(i){return document.getElementById("s"+i).checked;}
-function cb(t,i){return document.getElementById(t+i).checked;}
 
 /* SMART PLAN */
 function generate(){
 
-  players=getPlayers();
-  current=players.filter(p=>p.starter);
+  players = getPlayers();
+  current = players.filter(p => p.starter);
 
-  let match=+match.value, interval=+interval.value;
-  let slots=Math.floor(match/interval);
+  let match = +document.getElementById("match").value;
+  let interval = +document.getElementById("interval").value;
+  let slots = Math.floor(match / interval);
 
-  plan=[];
+  plan = [];
 
   for(let i=1;i<slots;i++){
 
-    let field=[...current];
+    let off = [...current].sort((a,b)=>b.minutes-a.minutes)[0];
 
-    field.sort((a,b)=>b.minutes-a.minutes);
-    let off=field[0];
+    let bench = players.filter(p => !current.includes(p));
 
-    let bench=players.filter(p=>!current.includes(p));
+    let same = bench.filter(p => samePos(p, off))
+                    .sort((a,b)=>a.minutes-b.minutes);
 
-    let same=bench.filter(p=>matchPos(p,off));
-    same.sort((a,b)=>a.minutes-b.minutes);
-
-    let on=same[0] || bench.sort((a,b)=>a.minutes-b.minutes)[0];
+    let on = same[0] || bench.sort((a,b)=>a.minutes-b.minutes)[0];
 
     if(off && on){
-      current=current.filter(p=>p!==off);
+      current = current.filter(p => p !== off);
       current.push(on);
 
-      plan.push({time:i*interval,off:off.name,on:on.name});
+      plan.push({
+        time: i*interval,
+        off: off.name,
+        on: on.name
+      });
     }
   }
 
   buildPlan();
   buildPitch();
-  index=0;
+  index = 0;
   updateNext();
 }
 
-function matchPos(a,b){
+function samePos(a,b){
   return (a.pos.def && b.pos.def) ||
          (a.pos.mid && b.pos.mid) ||
          (a.pos.att && b.pos.att);
 }
 
+/* PLAN UI */
 function buildPlan(){
-  let html="<table><tr><th>Time</th><th>Off</th><th>On</th></tr>";
+  let html = "<table><tr><th>Time</th><th>Off</th><th>On</th></tr>";
   plan.forEach(p=>{
-    html+=`<tr><td>${p.time}</td><td>${p.off}</td><td>${p.on}</td></tr>`;
+    html += `<tr><td>${p.time}</td><td>${p.off}</td><td>${p.on}</td></tr>`;
   });
-  html+="</table>";
-  planTable.innerHTML=html;
+  html += "</table>";
+  document.getElementById("planTable").innerHTML = html;
 }
 
-/* FORMATION */
+/* PITCH */
 function buildPitch(){
 
-  let f=document.getElementById("formation").value.split("-");
+  document.getElementById("pitch").innerHTML = `
+    <div class="line" id="att"></div>
+    <div class="line" id="mid"></div>
+    <div class="line" id="def"></div>
+  `;
 
-  pitch.innerHTML=`<div class="line" id="att"></div>
-                   <div class="line" id="mid"></div>
-                   <div class="line" id="def"></div>`;
+  current.forEach(p=>{
+    let el = document.createElement("div");
+    el.className = "token";
+    el.innerText = p.name;
 
-  let lines=["def","mid","att"];
-
-  current.forEach((p,i)=>{
-    let el=createToken(p);
-    let line=getLine(p,lines);
-    document.getElementById(line).appendChild(el);
+    let target = p.pos.att ? "att" : p.pos.mid ? "mid" : "def";
+    document.getElementById(target).appendChild(el);
   });
-}
-
-function createToken(p){
-  let el=document.createElement("div");
-  el.className="token";
-  el.innerText=p.name;
-  el.draggable=true;
-  el.ondragstart=e=>e.dataTransfer.setData("text",p.name);
-  el.onclick=()=>selected=p.name;
-  return el;
-}
-
-function getLine(p){
-  if(p.pos.att) return "att";
-  if(p.pos.mid) return "mid";
-  return "def";
 }
 
 /* MATCH */
@@ -265,7 +273,7 @@ function start(){
   if(timer) return;
   timer=setInterval(()=>{
     sec++;
-    clock.innerText=format(sec);
+    document.getElementById("clock").innerText = format(sec);
     current.forEach(p=>p.minutes+=1/60);
     renderMinutes();
   },1000);
@@ -276,28 +284,35 @@ function pause(){ clearInterval(timer); timer=null; }
 function nextSub(){ index++; updateNext(); }
 
 function updateNext(){
-  if(index>=plan.length){ next.innerText="Done"; return; }
+  if(index>=plan.length){
+    document.getElementById("next").innerText="Done";
+    return;
+  }
   let p=plan[index];
-  next.innerText=`${p.off} → ${p.on} @ ${p.time}m`;
+  document.getElementById("next").innerText =
+    `${p.off} → ${p.on} @ ${p.time}m`;
 }
 
 /* STATS */
 function renderMinutes(){
-  let total=+match.value, html="";
+  let total=+document.getElementById("match").value;
+  let html="";
   players.forEach(p=>{
     let percent=(p.minutes/total)*100;
     html+=`${p.name}
     <div class="barWrap"><div class="bar" style="width:${percent}%"></div></div>`;
   });
-  minutes.innerHTML=html;
+  document.getElementById("minutes").innerHTML=html;
 }
 
+/* UTIL */
 function format(s){
   let m=Math.floor(s/60).toString().padStart(2,'0');
   let ss=(s%60).toString().padStart(2,'0');
   return m+":"+ss;
 }
 
+/* INIT */
 setFormat();
 renderPlayers();
 
