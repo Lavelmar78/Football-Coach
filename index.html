@@ -15,9 +15,10 @@ header { background:#111; color:#fff; padding:12px; text-align:center; }
   position:fixed; bottom:0; width:100%;
   display:flex; background:#fff; border-top:1px solid #ccc;
 }
-.tabbar button { flex:1; padding:10px; border:none; }
+.tabbar button { flex:1; padding:10px; }
 
 .card { background:#fff; padding:10px; margin-bottom:10px; border-radius:8px; }
+
 .player { border-bottom:1px solid #eee; padding:6px 0; }
 
 .pitch {
@@ -49,10 +50,10 @@ header { background:#111; color:#fff; padding:12px; text-align:center; }
 <div class="card">
 
 <label>Match Length (mins)</label>
-<input id="match" value="40">
+<input id="matchLength" value="40">
 
 <label>Sub Window (mins, min 6)</label>
-<input id="block" value="6">
+<input id="subWindow" value="6">
 
 <label>Squad Size</label>
 <input id="count" value="10" onchange="renderPlayers()">
@@ -65,7 +66,7 @@ header { background:#111; color:#fff; padding:12px; text-align:center; }
 <select id="gk1"></select>
 <select id="gk2"></select>
 
-<button onclick="generate(); showTab('plan')">Generate Plan</button>
+<button onclick="generatePlan(); showTab('plan')">Generate Plan</button>
 
 </div>
 </div>
@@ -97,7 +98,7 @@ header { background:#111; color:#fff; padding:12px; text-align:center; }
 
 <script>
 
-let players=[], blocks=[], index=0;
+let players=[], blocks=[], currentIndex=0;
 
 /* NAV */
 function showTab(id){
@@ -107,16 +108,14 @@ function showTab(id){
 
 /* RENDER PLAYERS */
 function renderPlayers(){
-
   let saved = JSON.parse(localStorage.getItem("squad") || "[]");
-  let n = +document.getElementById("count").value;
-  let html="";
+  let n = parseInt(document.getElementById("count").value);
+  let html = "";
 
   for(let i=0;i<n;i++){
-
     let p = saved[i] || {};
 
-    html+=`
+    html += `
     <div class="player">
       <input id="p${i}" value="${p.name||""}" placeholder="Player" oninput="updateGK()"><br>
       <label><input type="checkbox" id="def${i}" ${p.def?"checked":""}>DEF</label>
@@ -133,7 +132,7 @@ function renderPlayers(){
 /* SAVE */
 function saveSquad(){
   let arr=[];
-  let n = +count.value;
+  let n=parseInt(document.getElementById("count").value);
 
   for(let i=0;i<n;i++){
     arr.push({
@@ -154,47 +153,40 @@ function getCheck(id){ return document.getElementById(id)?.checked || false; }
 
 /* GK */
 function updateGK(){
-  let n = +count.value;
+  let n=parseInt(document.getElementById("count").value);
   let html="";
+
   for(let i=0;i<n;i++){
     let name=getVal("p"+i)||"P"+(i+1);
-    html+=`<option value="${i}">${name}</option>`;
+    html += `<option value="${i}">${name}</option>`;
   }
-  gk1.innerHTML=html;
-  gk2.innerHTML=html;
+
+  document.getElementById("gk1").innerHTML = html;
+  document.getElementById("gk2").innerHTML = html;
 }
 
-/* POSITION MATCH */
-function fits(p,role){
-  return p.pos[role] || (!p.pos.def && !p.pos.midc && !p.pos.midw && !p.pos.att);
-}
-
-/* GENERATE */
-function generate(){
+/* GENERATE PLAN */
+function generatePlan(){
 
   players=[];
-  let n=+count.value;
+  let n=parseInt(document.getElementById("count").value);
 
   for(let i=0;i<n;i++){
     players.push({
       name:getVal("p"+i)||"P"+(i+1),
-      minutes:0,
-      pos:{
-        def:getCheck("def"+i),
-        midc:getCheck("midc"+i),
-        midw:getCheck("midw"+i),
-        att:getCheck("att"+i)
-      }
+      minutes:0
     });
   }
 
-  let matchLen=+match.value;
-  let block=Math.max(6,+block.value);
+  let matchLen=parseFloat(document.getElementById("matchLength").value);
+  let subWin=parseFloat(document.getElementById("subWindow").value);
+  let block = (!subWin || subWin < 6) ? 6 : subWin;
+
   let totalBlocks=Math.floor(matchLen/block);
   let half=Math.floor(totalBlocks/2);
 
-  let gk1p=players[gk1.value];
-  let gk2p=players[gk2.value];
+  let gk1p = players[document.getElementById("gk1").value];
+  let gk2p = players[document.getElementById("gk2").value];
 
   blocks=[];
 
@@ -203,11 +195,12 @@ function generate(){
     let gk = i<half ? gk1p : gk2p;
 
     let lineup=[gk];
+
     let pool=players.filter(p=>p!==gk);
 
     pool.sort((a,b)=>a.minutes-b.minutes);
 
-    while(lineup.length<7){
+    while(lineup.length<7 && pool.length>0){
       lineup.push(pool.shift());
     }
 
@@ -218,7 +211,8 @@ function generate(){
 
   buildPlan();
   drawPitch(blocks[0].lineup);
-  index=0;
+
+  currentIndex=0;
 }
 
 /* PLAN */
@@ -227,7 +221,7 @@ function buildPlan(){
   blocks.forEach(b=>{
     html+=`<div><b>${b.time}m</b>: ${b.lineup.map(p=>p.name).join(", ")}</div>`;
   });
-  planTable.innerHTML=html;
+  document.getElementById("planTable").innerHTML = html;
 }
 
 /* PITCH */
@@ -236,49 +230,48 @@ function drawPitch(lineup){
   let pitch=document.getElementById("pitch");
   pitch.innerHTML="";
 
-  let positions=[
-    {y:10,count:1},
-    {y:35,count:2},
-    {y:60,count:3},
-    {y:85,count:1}
-  ];
+  let layout=[1,2,3,1];
+  let y=[10,35,60,85];
 
   let i=0;
 
-  positions.forEach(r=>{
-    for(let j=0;j<r.count;j++){
+  for(let r=0;r<layout.length;r++){
+    for(let j=0;j<layout[r];j++){
+
       if(!lineup[i]) continue;
 
-      let x=(j+1)/(r.count+1)*100;
+      let x=(j+1)/(layout[r]+1)*100;
 
       let el=document.createElement("div");
       el.className="token";
       el.innerText=lineup[i].name;
 
       el.style.left=x+"%";
-      el.style.top=r.y+"%";
+      el.style.top=y[r]+"%";
 
       pitch.appendChild(el);
 
       i++;
     }
-  });
+  }
 }
 
 /* MATCH */
 function nextBlock(){
 
-  index++;
-  if(index>=blocks.length) return;
+  currentIndex++;
 
-  let current=blocks[index].lineup;
+  if(currentIndex>=blocks.length) return;
+
+  let current=blocks[currentIndex].lineup;
   drawPitch(current);
 
   let off=[...current].sort((a,b)=>b.minutes-a.minutes)[0];
   let bench=players.filter(p=>!current.includes(p));
   let on=[...bench].sort((a,b)=>a.minutes-b.minutes)[0];
 
-  suggestion.innerText=`Suggested: OFF ${off.name} / ON ${on.name}`;
+  document.getElementById("suggestion").innerText =
+    `Suggested: OFF ${off.name} / ON ${on.name}`;
 }
 
 /* INIT */
