@@ -18,24 +18,7 @@ header { background:#111; color:#fff; padding:12px; text-align:center; }
 .tabbar button { flex:1; padding:10px; }
 
 .card { background:#fff; padding:10px; margin-bottom:10px; border-radius:8px; }
-
 .player { border-bottom:1px solid #eee; padding:6px 0; }
-
-.pitch {
-  position:relative;
-  height:300px;
-  background:linear-gradient(#4CAF50,#388E3C);
-  border-radius:8px;
-}
-
-.token {
-  position:absolute;
-  background:#fff;
-  padding:4px;
-  border-radius:4px;
-  font-size:11px;
-  transform:translate(-50%,-50%);
-}
 
 .highlight { background:#ffeeba; padding:10px; text-align:center; }
 </style>
@@ -57,13 +40,6 @@ header { background:#111; color:#fff; padding:12px; text-align:center; }
 
 <label>Squad Size</label>
 <input id="count" value="10" onchange="renderPlayers()">
-
-<label>Formation</label>
-<select id="formation">
-<option value="2-3-1">2-3-1</option>
-<option value="3-2-1">3-2-1</option>
-<option value="3-3">3-3</option>
-</select>
 
 <div id="players"></div>
 
@@ -89,11 +65,6 @@ header { background:#111; color:#fff; padding:12px; text-align:center; }
 <h3>Minutes</h3>
 <div id="minutesTable"></div>
 </div>
-
-<div class="card">
-<h3>Pitch</h3>
-<div id="pitch" class="pitch"></div>
-</div>
 </div>
 
 <!-- MATCH -->
@@ -118,13 +89,14 @@ function showTab(id){
   document.getElementById(id).classList.add("active");
 }
 
-/* PLAYERS */
+/* RENDER PLAYERS (FIXED) */
 function renderPlayers(){
 
+  let container = document.getElementById("players");
   let saved = JSON.parse(localStorage.getItem("squad") || "[]");
 
-  let n = count.value;
-  let html="";
+  let n = parseInt(document.getElementById("count").value);
+  let html = "";
 
   for(let i=0;i<n;i++){
 
@@ -132,7 +104,7 @@ function renderPlayers(){
 
     html += `
     <div class="player">
-      <input id="p${i}" value="${p.name||""}" placeholder="Player">
+      <input id="p${i}" value="${p.name||""}" placeholder="Player" oninput="updateGK()">
       <br>
       <label><input type="checkbox" id="def${i}" ${p.def?"checked":""}>DEF</label>
       <label><input type="checkbox" id="midc${i}" ${p.midc?"checked":""}>MID-C</label>
@@ -141,60 +113,66 @@ function renderPlayers(){
     </div>`;
   }
 
-  playersDiv.innerHTML = html;
+  container.innerHTML = html;
   updateGK();
 }
 
 /* SAVE */
 function saveSquad(){
   let arr=[];
-  for(let i=0;i<count.value;i++){
+  let n = parseInt(document.getElementById("count").value);
+
+  for(let i=0;i<n;i++){
     arr.push({
-      name:p(i),
-      def:def(i),
-      midc:midc(i),
-      midw:midw(i),
-      att:att(i)
+      name:getVal("p"+i),
+      def:getCheck("def"+i),
+      midc:getCheck("midc"+i),
+      midw:getCheck("midw"+i),
+      att:getCheck("att"+i)
     });
   }
+
   localStorage.setItem("squad", JSON.stringify(arr));
 }
 
 /* HELPERS */
-function p(i){return document.getElementById("p"+i).value;}
-function def(i){return document.getElementById("def"+i).checked;}
-function midc(i){return document.getElementById("midc"+i).checked;}
-function midw(i){return document.getElementById("midw"+i).checked;}
-function att(i){return document.getElementById("att"+i).checked;}
+function getVal(id){ return document.getElementById(id)?.value || ""; }
+function getCheck(id){ return document.getElementById(id)?.checked || false; }
 
-/* GK */
+/* GK UPDATE (FIXED) */
 function updateGK(){
-  let html="";
-  for(let i=0;i<count.value;i++){
-    html+=`<option value="${i}">${p(i)||"P"+(i+1)}</option>`;
+
+  let n = parseInt(document.getElementById("count").value);
+  let html = "";
+
+  for(let i=0;i<n;i++){
+    let name = getVal("p"+i) || "P"+(i+1);
+    html += `<option value="${i}">${name}</option>`;
   }
-  gk1.innerHTML=html;
-  gk2.innerHTML=html;
+
+  document.getElementById("gk1").innerHTML = html;
+  document.getElementById("gk2").innerHTML = html;
 }
 
 /* GENERATE */
 function generate(){
 
   players=[];
-  for(let i=0;i<count.value;i++){
+  let n = parseInt(document.getElementById("count").value);
+
+  for(let i=0;i<n;i++){
     players.push({
-      name:p(i)||"P"+(i+1),
-      minutes:0,
-      pos:{def:def(i),midc:midc(i),midw:midw(i),att:att(i)}
+      name:getVal("p"+i) || "P"+(i+1),
+      minutes:0
     });
   }
 
-  let match=+match.value;
-  let block=+block.value || 6;
+  let matchLen = parseFloat(document.getElementById("match").value);
+  let blockInput = parseFloat(document.getElementById("block").value);
 
-  let blocksCount=Math.floor(match/block);
+  let block = (!blockInput || blockInput < 6) ? 6 : blockInput;
 
-  let ideal=(match*(players.length-3))/players.length;
+  let blocksCount = Math.floor(matchLen / block);
 
   blocks=[];
 
@@ -202,9 +180,9 @@ function generate(){
 
     players.sort((a,b)=>a.minutes-b.minutes);
 
-    let lineup=players.slice(0,7);
+    let lineup = players.slice(0,7);
 
-    lineup.forEach(p=>p.minutes+=block);
+    lineup.forEach(p=>p.minutes += block);
 
     blocks.push({time:i*block,lineup});
   }
@@ -219,7 +197,7 @@ function buildPlan(){
   blocks.forEach(b=>{
     html+=`<div><b>${b.time}m</b>: ${b.lineup.map(p=>p.name).join(", ")}</div>`;
   });
-  planTable.innerHTML=html;
+  document.getElementById("planTable").innerHTML=html;
 }
 
 /* MINUTES */
@@ -228,10 +206,10 @@ function buildMinutes(){
   players.forEach(p=>{
     html+=`${p.name}: ${p.minutes.toFixed(1)} mins<br>`;
   });
-  minutesTable.innerHTML=html;
+  document.getElementById("minutesTable").innerHTML=html;
 }
 
-/* LIVE SUGGEST */
+/* LIVE */
 function nextBlock(){
 
   index++;
@@ -239,12 +217,13 @@ function nextBlock(){
   let current=blocks[index];
   if(!current) return;
 
-  let off=current.lineup.sort((a,b)=>b.minutes-a.minutes)[0];
+  let off=[...current.lineup].sort((a,b)=>b.minutes-a.minutes)[0];
   let bench=players.filter(p=>!current.lineup.includes(p));
 
-  let on=bench.sort((a,b)=>a.minutes-b.minutes)[0];
+  let on=[...bench].sort((a,b)=>a.minutes-b.minutes)[0];
 
-  suggestion.innerText=`Suggested: OFF ${off.name} / ON ${on.name}`;
+  document.getElementById("suggestion").innerText =
+    `Suggested: OFF ${off.name} / ON ${on.name}`;
 }
 
 /* INIT */
