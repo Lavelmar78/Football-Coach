@@ -18,8 +18,7 @@ header { background:#111; color:#fff; padding:12px; text-align:center; }
 .tabbar button { flex:1; padding:10px; border:none; }
 
 .card { background:#fff; padding:10px; margin-bottom:10px; border-radius:8px; }
-
-.player { padding:5px 0; border-bottom:1px solid #eee; }
+.player { border-bottom:1px solid #eee; padding:6px 0; }
 
 .pitch {
   position:relative;
@@ -39,9 +38,6 @@ header { background:#111; color:#fff; padding:12px; text-align:center; }
 
 .big { font-size:26px; text-align:center; }
 .highlight { background:#ffeeba; padding:10px; text-align:center; }
-
-.barWrap { background:#eee; }
-.bar { height:10px; background:#4CAF50; }
 </style>
 </head>
 
@@ -61,11 +57,15 @@ header { background:#111; color:#fff; padding:12px; text-align:center; }
 <option value="2-2-2">2-2-2</option>
 </select>
 
-<input id="match" value="40" placeholder="Match mins">
-<input id="block" value="6" placeholder="Min sub window">
+<input id="match" value="40">
+<input id="block" value="6">
 <input id="count" value="10" onchange="renderPlayers()">
 
 <div id="players"></div>
+
+<h4>Goalkeepers</h4>
+<select id="gk1"></select>
+<select id="gk2"></select>
 
 <button onclick="generate(); showTab('plan')">Generate Plan</button>
 
@@ -94,24 +94,15 @@ header { background:#111; color:#fff; padding:12px; text-align:center; }
 <button onclick="nextBlock()">Next Block</button>
 </div>
 
-<!-- STATS -->
-<div id="stats" class="screen">
-<div class="card">
-<h3>Minutes</h3>
-<div id="minutes"></div>
-</div>
-</div>
-
 <div class="tabbar">
 <button onclick="showTab('setup')">Setup</button>
 <button onclick="showTab('plan')">Plan</button>
 <button onclick="showTab('matchScreen')">Match</button>
-<button onclick="showTab('stats')">Stats</button>
 </div>
 
 <script>
 
-let players=[], blocks=[], current=[], sec=0, timer=null, index=0;
+let players=[], blocks=[], current=[], index=0, sec=0, timer=null;
 
 /* NAV */
 function showTab(id){
@@ -119,7 +110,7 @@ function showTab(id){
   document.getElementById(id).classList.add("active");
 }
 
-/* RENDER PLAYERS (FIXED) */
+/* RENDER PLAYERS */
 function renderPlayers(){
   let n = document.getElementById("count").value;
   let html = "";
@@ -128,11 +119,29 @@ function renderPlayers(){
     html += `
     <div class="player">
       <input id="p${i}" placeholder="Player ${i+1}">
-      <label><input type="checkbox" id="s${i}"> Starter</label>
+      <label><input type="checkbox" id="s${i}"> Starter</label><br>
+      <label><input type="checkbox" id="def${i}">DEF</label>
+      <label><input type="checkbox" id="mid${i}">MID</label>
+      <label><input type="checkbox" id="att${i}">ATT</label>
     </div>`;
   }
 
   document.getElementById("players").innerHTML = html;
+  updateGK();
+}
+
+/* GK DROPDOWN */
+function updateGK(){
+  let n = document.getElementById("count").value;
+  let html = "";
+
+  for(let i=0;i<n;i++){
+    let name = document.getElementById("p"+i)?.value || "P"+(i+1);
+    html += `<option value="${i}">${name}</option>`;
+  }
+
+  document.getElementById("gk1").innerHTML = html;
+  document.getElementById("gk2").innerHTML = html;
 }
 
 /* DATA */
@@ -144,47 +153,73 @@ function getPlayers(){
     arr.push({
       name: document.getElementById("p"+i).value || "P"+(i+1),
       starter: document.getElementById("s"+i).checked,
-      minutes: 0
+      minutes: 0,
+      pos:{
+        def: document.getElementById("def"+i).checked,
+        mid: document.getElementById("mid"+i).checked,
+        att: document.getElementById("att"+i).checked
+      }
     });
   }
 
   return arr;
 }
 
-/* FAIR ROTATION ENGINE */
+/* POSITION MATCH */
+function fits(player, role){
+  return player.pos[role] || (!player.pos.def && !player.pos.mid && !player.pos.att);
+}
+
+/* GENERATE PLAN */
 function generate(){
 
   players = getPlayers();
 
-  let starters = players.filter(p=>p.starter);
-  if(starters.length === 0){
-    alert("Select starters");
-    return;
-  }
-
   let match = +document.getElementById("match").value;
   let block = Math.max(6, +document.getElementById("block").value);
-
   let totalBlocks = Math.floor(match / block);
+
+  let formation = document.getElementById("formation").value.split("-");
+  let roles = [
+    ...Array(+formation[0]).fill("def"),
+    ...Array(+formation[1]).fill("mid"),
+    ...Array(+formation[2]).fill("att")
+  ];
+
+  let gk1 = players[document.getElementById("gk1").value];
+  let gk2 = players[document.getElementById("gk2").value];
 
   blocks = [];
 
   for(let i=0;i<totalBlocks;i++){
 
-    players.sort((a,b)=>a.minutes - b.minutes);
+    let half = i < totalBlocks/2 ? 1 : 2;
+    let gk = half === 1 ? gk1 : gk2;
 
-    let lineup = players.slice(0, starters.length);
+    let lineup = [gk];
+
+    let available = players.filter(p => p !== gk);
+
+    roles.forEach(role=>{
+      let candidates = available
+        .filter(p=>fits(p,role))
+        .sort((a,b)=>a.minutes - b.minutes);
+
+      let pick = candidates[0] || available.sort((a,b)=>a.minutes-b.minutes)[0];
+
+      lineup.push(pick);
+      available = available.filter(p=>p!==pick);
+    });
 
     lineup.forEach(p=>p.minutes += block);
 
     blocks.push({
-      time: i * block,
+      time: i*block,
       lineup: lineup.map(p=>p.name)
     });
   }
 
   buildPlan();
-
   current = blocks[0].lineup;
   drawFormation(current);
 
@@ -192,13 +227,13 @@ function generate(){
   updateNext();
 }
 
-/* PLAN */
+/* PLAN UI */
 function buildPlan(){
-  let html = "";
+  let html="";
   blocks.forEach(b=>{
-    html += `<div><b>${b.time}m</b>: ${b.lineup.join(", ")}</div>`;
+    html+=`<div><b>${b.time}m</b>: ${b.lineup.join(", ")}</div>`;
   });
-  document.getElementById("planTable").innerHTML = html;
+  document.getElementById("planTable").innerHTML=html;
 }
 
 /* FORMATION */
@@ -210,9 +245,10 @@ function drawFormation(lineup){
   let f = document.getElementById("formation").value.split("-");
 
   let rows = [
-    {y:20,count:+f[2]},
-    {y:50,count:+f[1]},
-    {y:80,count:+f[0]}
+    {y:15,count:1}, // GK
+    {y:35,count:+f[0]},
+    {y:60,count:+f[1]},
+    {y:85,count:+f[2]}
   ];
 
   let i = 0;
@@ -252,7 +288,6 @@ function pause(){ clearInterval(timer); timer=null; }
 function nextBlock(){
   index++;
   if(index>=blocks.length) return;
-
   current = blocks[index].lineup;
   drawFormation(current);
   updateNext();
@@ -263,7 +298,6 @@ function updateNext(){
     document.getElementById("next").innerText="Done";
     return;
   }
-
   document.getElementById("next").innerText =
     "Next change @ "+blocks[index+1].time+"m";
 }
