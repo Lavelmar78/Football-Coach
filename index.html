@@ -56,14 +56,14 @@ header { background:#111; color:#fff; padding:12px; text-align:center; }
 <input id="subWindow" value="6">
 
 <label>Squad Size</label>
-<input id="count" value="11" onchange="renderPlayers()">
+<input id="count" value="11">
 
 <label>
 <input type="checkbox" id="gkMode" checked>
 GK full match mode
 </label>
 
-<div id="players"></div>
+<div id="playersContainer"></div>
 
 <button onclick="saveSquad()">Save Squad</button>
 
@@ -111,28 +111,37 @@ GK full match mode
 
 <script>
 
-let players=[], blocks=[], currentIndex=0;
-let timer=null, seconds=0;
+let playersData = [];
+let blocks = [];
+let currentIndex = 0;
+let timer = null;
+let seconds = 0;
 
 /* HELPERS */
-function val(id){return document.getElementById(id)?.value||"";}
-function chk(id){return document.getElementById(id)?.checked||false;}
+function getVal(id){ return document.getElementById(id)?.value || ""; }
+function getChk(id){ return document.getElementById(id)?.checked || false; }
 
-function shuffle(arr){
-  return arr.sort(()=>Math.random()-0.5);
+/* NAV */
+function showTab(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
 }
 
-/* RENDER */
+/* RENDER PLAYERS */
 function renderPlayers(){
-  let saved = JSON.parse(localStorage.getItem("squad")||"[]");
-  let n=+val("count");
-  let html="";
+
+  const container = document.getElementById("playersContainer");
+  const saved = JSON.parse(localStorage.getItem("squad")||"[]");
+  const n = parseInt(getVal("count")) || 0;
+
+  let html = "";
 
   for(let i=0;i<n;i++){
-    let p=saved[i]||{};
-    html+=`
+    let p = saved[i] || {};
+
+    html += `
     <div class="player">
-      <input id="p${i}" value="${p.name||""}" oninput="updateGK()">
+      <input id="p${i}" value="${p.name||""}" placeholder="Player" oninput="updateGK()">
       <label><input type="checkbox" id="avail${i}" ${p.avail!==false?"checked":""}>Avail</label><br>
       <label><input type="checkbox" id="def${i}" ${p.def?"checked":""}>DEF</label>
       <label><input type="checkbox" id="midc${i}" ${p.midc?"checked":""}>MID-C</label>
@@ -141,63 +150,77 @@ function renderPlayers(){
     </div>`;
   }
 
-  players.innerHTML=html;
+  container.innerHTML = html;
   updateGK();
 }
 
 /* SAVE */
 function saveSquad(){
   let arr=[];
-  for(let i=0;i<count.value;i++){
+  let n = parseInt(getVal("count"));
+
+  for(let i=0;i<n;i++){
     arr.push({
-      name:val("p"+i),
-      avail:chk("avail"+i),
-      def:chk("def"+i),
-      midc:chk("midc"+i),
-      midw:chk("midw"+i),
-      att:chk("att"+i)
+      name:getVal("p"+i),
+      avail:getChk("avail"+i),
+      def:getChk("def"+i),
+      midc:getChk("midc"+i),
+      midw:getChk("midw"+i),
+      att:getChk("att"+i)
     });
   }
+
   localStorage.setItem("squad", JSON.stringify(arr));
 }
 
 /* GK */
 function updateGK(){
   let html="";
-  for(let i=0;i<count.value;i++){
-    if(!chk("avail"+i)) continue;
-    html+=`<option>${val("p"+i)||"P"+(i+1)}</option>`;
+  let n=parseInt(getVal("count"));
+
+  for(let i=0;i<n;i++){
+    if(!getChk("avail"+i)) continue;
+    let name=getVal("p"+i)||"P"+(i+1);
+    html+=`<option>${name}</option>`;
   }
-  gk1.innerHTML=html;
-  gk2.innerHTML=html;
+
+  document.getElementById("gk1").innerHTML = html;
+  document.getElementById("gk2").innerHTML = html;
 }
 
-/* GENERATE */
+/* SHUFFLE */
+function shuffle(arr){
+  return arr.sort(()=>Math.random()-0.5);
+}
+
+/* GENERATE PLAN */
 function generatePlan(){
 
-  players=[];
+  playersData = [];
 
-  for(let i=0;i<count.value;i++){
-    if(!chk("avail"+i)) continue;
+  let n=parseInt(getVal("count"));
 
-    players.push({
-      name:val("p"+i)||"P"+(i+1),
+  for(let i=0;i<n;i++){
+    if(!getChk("avail"+i)) continue;
+
+    playersData.push({
+      name:getVal("p"+i)||"P"+(i+1),
       minutes:0,
       pos:{
-        def:chk("def"+i),
-        midc:chk("midc"+i),
-        midw:chk("midw"+i),
-        att:chk("att"+i)
+        def:getChk("def"+i),
+        midc:getChk("midc"+i),
+        midw:getChk("midw"+i),
+        att:getChk("att"+i)
       }
     });
   }
 
-  let block=Math.max(6,+val("subWindow"));
-  let totalBlocks=Math.floor(+val("matchLength")/block);
+  let block=Math.max(6,parseFloat(getVal("subWindow")));
+  let totalBlocks=Math.floor(parseFloat(getVal("matchLength"))/block);
   let half=Math.floor(totalBlocks/2);
 
-  let gk1p=players.find(p=>p.name===gk1.value);
-  let gk2p=players.find(p=>p.name===gk2.value);
+  let gk1p=playersData.find(p=>p.name===document.getElementById("gk1").value);
+  let gk2p=playersData.find(p=>p.name===document.getElementById("gk2").value);
 
   blocks=[];
 
@@ -206,7 +229,7 @@ function generatePlan(){
     let gk=i<half?gk1p:gk2p;
     let lineup=[gk];
 
-    let pool=players.filter(p=>p!==gk);
+    let pool=playersData.filter(p=>p!==gk);
 
     function pick(role){
       let group=shuffle(pool.filter(p=>p.pos[role]));
@@ -246,30 +269,39 @@ function generatePlan(){
 
 /* PLAN */
 function buildPlan(){
-  planTable.innerHTML=blocks.map(b=>`<div><b>${b.time}m</b>: ${b.lineup.map(p=>p.name).join(", ")}</div>`).join("");
+  document.getElementById("planTable").innerHTML =
+    blocks.map(b=>`<div><b>${b.time}m</b>: ${b.lineup.map(p=>p.name).join(", ")}</div>`).join("");
 }
 
 /* MINUTES */
 function buildMinutes(){
-  minutesTable.innerHTML=players.map(p=>`${p.name}: ${p.minutes} mins`).join("<br>");
+  document.getElementById("minutesTable").innerHTML =
+    playersData.map(p=>`${p.name}: ${p.minutes} mins`).join("<br>");
 }
 
 /* PITCH */
 function drawPitch(lineup){
+
   let pitch=document.getElementById("pitch");
   pitch.innerHTML="";
-  let layout=[1,2,3,1], y=[10,35,60,85], i=0;
 
-  layout.forEach((c,r)=>{
-    for(let j=0;j<c;j++){
+  let layout=[1,2,3,1];
+  let y=[10,35,60,85];
+
+  let i=0;
+
+  layout.forEach((count,row)=>{
+    for(let j=0;j<count;j++){
       let p=lineup[i++];
       if(!p) continue;
 
       let el=document.createElement("div");
       el.className="token";
       el.innerText=p.name;
-      el.style.left=((j+1)/(c+1)*100)+"%";
-      el.style.top=y[r]+"%";
+
+      el.style.left=((j+1)/(count+1)*100)+"%";
+      el.style.top=y[row]+"%";
+
       pitch.appendChild(el);
     }
   });
@@ -277,6 +309,7 @@ function drawPitch(lineup){
 
 /* MATCH */
 function updateNextSub(){
+
   if(!blocks[currentIndex+1]) return;
 
   let current=blocks[currentIndex].lineup;
@@ -285,7 +318,8 @@ function updateNextSub(){
   let off=current.filter(p=>!next.includes(p));
   let on=next.filter(p=>!current.includes(p));
 
-  nextSub.innerText=`Next: OFF ${off.map(p=>p.name).join(", ")} | ON ${on.map(p=>p.name).join(", ")}`;
+  document.getElementById("nextSub").innerText =
+    `Next: OFF ${off.map(p=>p.name).join(", ")} | ON ${on.map(p=>p.name).join(", ")}`;
 }
 
 /* TIMER */
@@ -294,11 +328,13 @@ function startMatch(){
 
   timer=setInterval(()=>{
     seconds++;
+
     let m=Math.floor(seconds/60).toString().padStart(2,'0');
     let s=(seconds%60).toString().padStart(2,'0');
+
     clock.innerText=`${m}:${s}`;
 
-    let block=+val("subWindow");
+    let block=parseFloat(getVal("subWindow"));
     let next=Math.ceil(seconds/60/block)*block;
 
     nextChange.innerText=`Next change at ${next} min`;
@@ -306,10 +342,10 @@ function startMatch(){
   },1000);
 }
 
-function pauseMatch(){clearInterval(timer);timer=null;}
-function resetMatch(){pauseMatch();seconds=0;clock.innerText="00:00";}
+function pauseMatch(){ clearInterval(timer); timer=null; }
+function resetMatch(){ pauseMatch(); seconds=0; clock.innerText="00:00"; }
 
-/* STEP */
+/* NEXT */
 function nextBlock(){
   currentIndex++;
   if(currentIndex>=blocks.length) return;
@@ -322,5 +358,6 @@ function nextBlock(){
 renderPlayers();
 
 </script>
+
 </body>
 </html>
