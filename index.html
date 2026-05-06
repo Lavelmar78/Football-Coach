@@ -46,6 +46,7 @@ header { background:#111; color:#fff; padding:12px; text-align:center; }
 
 <header>⚽ Coach Pro Elite</header>
 
+<!-- SETUP -->
 <div id="setup" class="screen active">
 <div class="card">
 
@@ -56,7 +57,7 @@ header { background:#111; color:#fff; padding:12px; text-align:center; }
 <input id="subWindow" value="6">
 
 <label>Squad Size</label>
-<input id="count" value="11">
+<input id="count" value="11" onchange="renderPlayers()">
 
 <label>
 <input type="checkbox" id="gkMode" checked>
@@ -76,9 +77,10 @@ GK full match mode
 </div>
 </div>
 
+<!-- PLAN -->
 <div id="plan" class="screen">
 <div class="card">
-<h3>Plan</h3>
+<h3>Rotation Plan</h3>
 <div id="planTable"></div>
 </div>
 
@@ -88,10 +90,12 @@ GK full match mode
 </div>
 
 <div class="card">
+<h3>Pitch</h3>
 <div id="pitch" class="pitch"></div>
 </div>
 </div>
 
+<!-- MATCH -->
 <div id="matchScreen" class="screen">
 <div class="timer" id="clock">00:00</div>
 <div id="nextChange" class="highlight"></div>
@@ -129,7 +133,6 @@ function showTab(id){
 
 /* RENDER PLAYERS */
 function renderPlayers(){
-
   const container = document.getElementById("playersContainer");
   const saved = JSON.parse(localStorage.getItem("squad")||"[]");
   const n = parseInt(getVal("count")) || 0;
@@ -188,11 +191,6 @@ function updateGK(){
   document.getElementById("gk2").innerHTML = html;
 }
 
-/* SHUFFLE */
-function shuffle(arr){
-  return arr.sort(()=>Math.random()-0.5);
-}
-
 /* GENERATE PLAN */
 function generatePlan(){
 
@@ -222,37 +220,45 @@ function generatePlan(){
   let gk1p=playersData.find(p=>p.name===document.getElementById("gk1").value);
   let gk2p=playersData.find(p=>p.name===document.getElementById("gk2").value);
 
+  const template = ["gk","def","def","midc","midc","midw","att"];
+
   blocks=[];
 
   for(let i=0;i<totalBlocks;i++){
 
     let gk=i<half?gk1p:gk2p;
-    let lineup=[gk];
-
-    let pool=playersData.filter(p=>p!==gk);
+    let lineup=[];
+    let pool=[...playersData];
 
     function pick(role){
-      let group=shuffle(pool.filter(p=>p.pos[role]));
-      group.sort((a,b)=>a.minutes-b.minutes);
-      if(group.length){
-        let chosen=group[0];
-        pool=pool.filter(p=>p!==chosen);
-        return chosen;
+
+      let candidates = pool.filter(p=>{
+        if(p===gk) return false;
+        if(role==="def") return p.pos.def;
+        if(role==="midc") return p.pos.midc;
+        if(role==="midw") return p.pos.midw;
+        if(role==="att") return p.pos.att;
+        return true;
+      });
+
+      if(candidates.length===0){
+        candidates = pool.filter(p=>p!==gk);
       }
-      return null;
+
+      candidates.sort((a,b)=>a.minutes-b.minutes);
+
+      let chosen=candidates[0];
+      pool=pool.filter(p=>p!==chosen);
+      return chosen;
     }
 
-    ["midc","def","midw","att"].forEach(role=>{
-      while(lineup.length<7){
-        let p=pick(role);
-        if(!p) break;
-        lineup.push(p);
+    template.forEach(role=>{
+      if(role==="gk"){
+        lineup.push(gk);
+      } else {
+        lineup.push(pick(role));
       }
     });
-
-    while(lineup.length<7){
-      lineup.push(pool.shift());
-    }
 
     lineup.forEach(p=>p.minutes+=block);
 
