@@ -7,19 +7,14 @@
 <style>
 body { font-family:-apple-system; margin:0; background:#f5f5f5; }
 header { background:#111; color:#fff; padding:12px; text-align:center; }
-
 .screen { display:none; padding:10px 10px 80px; }
 .active { display:block; }
-
 .tabbar { position:fixed; bottom:0; width:100%; display:flex; background:#fff; border-top:1px solid #ccc; }
 .tabbar button { flex:1; padding:10px; }
-
 .card { background:#fff; padding:10px; margin-bottom:10px; border-radius:8px; }
 .player { border-bottom:1px solid #eee; padding:6px 0; }
-
 .pitch { position:relative; height:320px; background:linear-gradient(#4CAF50,#388E3C); border-radius:8px; }
 .token { position:absolute; background:#fff; padding:4px; border-radius:4px; font-size:11px; transform:translate(-50%,-50%); }
-
 .highlight { background:#ffeeba; padding:10px; text-align:center; }
 .timer { font-size:28px; text-align:center; margin:10px 0; }
 </style>
@@ -33,10 +28,7 @@ header { background:#111; color:#fff; padding:12px; text-align:center; }
 <div class="card">
 
 <label>Match Length</label>
-<input id="matchLength" value="40">
-
-<label>Sub Window</label>
-<input id="subWindow" value="6">
+<input id="matchLength" value="52">
 
 <label>Squad Size</label>
 <input id="count" value="11" onchange="renderPlayers()">
@@ -84,28 +76,21 @@ header { background:#111; color:#fff; padding:12px; text-align:center; }
 let playersData=[], blocks=[], currentIndex=0;
 let timer=null, seconds=0;
 
-/* HELPERS */
 const val=id=>document.getElementById(id)?.value||"";
 const chk=id=>document.getElementById(id)?.checked||false;
 
-/* NAV */
 function showTab(id){
   document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
   document.getElementById(id).classList.add("active");
 }
 
-/* SHUFFLE */
-function shuffle(arr){
-  return [...arr].sort(()=>Math.random()-0.5);
-}
+function shuffle(arr){ return [...arr].sort(()=>Math.random()-0.5); }
 
 /* RENDER */
 function renderPlayers(){
   const saved=JSON.parse(localStorage.getItem("squad")||"[]");
-  const n=+val("count");
   let html="";
-
-  for(let i=0;i<n;i++){
+  for(let i=0;i<+val("count");i++){
     let p=saved[i]||{};
     html+=`
     <div class="player">
@@ -117,12 +102,10 @@ function renderPlayers(){
       <label><input type="checkbox" id="att${i}" ${p.att?"checked":""}>ATT</label>
     </div>`;
   }
-
   document.getElementById("playersContainer").innerHTML=html;
   updateGK();
 }
 
-/* SAVE */
 function saveSquad(){
   let arr=[];
   for(let i=0;i<count.value;i++){
@@ -138,7 +121,6 @@ function saveSquad(){
   localStorage.setItem("squad", JSON.stringify(arr));
 }
 
-/* GK */
 function updateGK(){
   let html="";
   for(let i=0;i<count.value;i++){
@@ -149,87 +131,49 @@ function updateGK(){
   gk2.innerHTML=html;
 }
 
-/* GENERATE */
+/* CORE ENGINE */
 function generatePlan(){
 
   playersData=[];
 
   for(let i=0;i<count.value;i++){
     if(!chk("avail"+i)) continue;
-
-    playersData.push({
-      name:val("p"+i)||"P"+(i+1),
-      minutes:0,
-      pos:{
-        def:chk("def"+i),
-        midc:chk("midc"+i),
-        midw:chk("midw"+i),
-        att:chk("att"+i)
-      }
-    });
+    playersData.push({ name:val("p"+i)||"P"+(i+1), minutes:0 });
   }
 
-  let block=Math.max(6,+val("subWindow"));
-  let totalBlocks=Math.floor(+val("matchLength")/block);
-  let half=Math.floor(totalBlocks/2);
+  let matchLen=+val("matchLength");
+  let half=matchLen/2;
 
   let gk1p=playersData.find(p=>p.name===gk1.value);
   let gk2p=playersData.find(p=>p.name===gk2.value);
 
-  const template=["gk","def","def","midc","midc","midw","att"];
+  let outfieldCount=7;
+  let totalSlots=matchLen*outfieldCount;
+  let ideal=totalSlots/playersData.length;
+
+  let blockSize= Math.max(6, Math.floor(matchLen/4)); // auto fewest blocks
+  let totalBlocks=Math.floor(matchLen/blockSize);
 
   blocks=[];
 
-  for(let i=0;i<totalBlocks;i++){
+  for(let b=0;b<totalBlocks;b++){
 
-    let gk=i<half?gk1p:gk2p;
+    let time=b*blockSize;
+    let gk=time<half?gk1p:gk2p;
 
-    let lineup=[];
-    let pool=[...playersData];
+    let lineup=[gk];
 
-    function pick(role){
+    let pool=shuffle(playersData.filter(p=>p!==gk));
 
-      let candidates=pool.filter(p=>{
-        if(p===gk) return false;
+    pool.sort((a,b)=>a.minutes-b.minutes);
 
-        // GK full match logic
-        if(chk("gkMode")){
-          if(i<half && p===gk2p) return false;
-          if(i>=half && p===gk1p) return false;
-        }
-
-        if(role==="def") return p.pos.def;
-        if(role==="midc") return p.pos.midc;
-        if(role==="midw") return p.pos.midw;
-        if(role==="att") return p.pos.att;
-
-        return true;
-      });
-
-      if(candidates.length===0){
-        candidates=pool.filter(p=>p!==gk);
-      }
-
-      candidates=shuffle(candidates);
-      candidates.sort((a,b)=>a.minutes-b.minutes);
-
-      let chosen=candidates[0];
-      pool=pool.filter(p=>p!==chosen);
-
-      return chosen;
+    while(lineup.length<7){
+      lineup.push(pool.shift());
     }
 
-    template.forEach(role=>{
-      if(role==="gk"){
-        lineup.push(gk);
-      } else {
-        lineup.push(pick(role));
-      }
-    });
+    lineup.forEach(p=>p.minutes+=blockSize);
 
-    lineup.forEach(p=>p.minutes+=block);
-
-    blocks.push({time:i*block,lineup});
+    blocks.push({time,lineup});
   }
 
   buildPlan();
@@ -240,17 +184,33 @@ function generatePlan(){
   updateNextSub();
 }
 
-/* PLAN */
+/* PLAN WITH SUBS */
 function buildPlan(){
-  planTable.innerHTML=blocks.map(b=>`<div><b>${b.time}m</b>: ${b.lineup.map(p=>p.name).join(", ")}</div>`).join("");
+  let html="";
+
+  for(let i=0;i<blocks.length;i++){
+
+    let b=blocks[i];
+    let next=blocks[i+1];
+
+    html+=`<div><b>${b.time}m</b>: ${b.lineup.map(p=>p.name).join(", ")}`;
+
+    if(next){
+      let off=b.lineup.filter(p=>!next.lineup.includes(p));
+      let on=next.lineup.filter(p=>!b.lineup.includes(p));
+      html+=`<br><small>OFF ${off.map(p=>p.name)} → ON ${on.map(p=>p.name)}</small>`;
+    }
+
+    html+="</div>";
+  }
+
+  planTable.innerHTML=html;
 }
 
-/* MINUTES */
 function buildMinutes(){
   minutesTable.innerHTML=playersData.map(p=>`${p.name}: ${p.minutes} mins`).join("<br>");
 }
 
-/* PITCH */
 function drawPitch(lineup){
   let pitch=document.getElementById("pitch");
   pitch.innerHTML="";
@@ -277,28 +237,28 @@ function drawPitch(lineup){
 function updateNextSub(){
   if(!blocks[currentIndex+1]) return;
 
-  let current=blocks[currentIndex].lineup;
-  let next=blocks[currentIndex+1].lineup;
+  let current=blocks[currentIndex];
+  let next=blocks[currentIndex+1];
 
-  let off=current.filter(p=>!next.includes(p));
-  let on=next.filter(p=>!current.includes(p));
+  let off=current.lineup.filter(p=>!next.lineup.includes(p));
+  let on=next.lineup.filter(p=>!current.lineup.includes(p));
 
-  nextSub.innerText=`Next: OFF ${off.map(p=>p.name).join(", ")} | ON ${on.map(p=>p.name).join(", ")}`;
+  nextSub.innerText=`Next: OFF ${off.map(p=>p.name)} → ON ${on.map(p=>p.name)}`;
 }
 
-/* TIMER */
 function startMatch(){
   if(timer) return;
 
   timer=setInterval(()=>{
     seconds++;
+
     let m=Math.floor(seconds/60).toString().padStart(2,'0');
     let s=(seconds%60).toString().padStart(2,'0');
+
     clock.innerText=`${m}:${s}`;
 
-    let block=+val("subWindow");
-    let next=Math.ceil(seconds/60/block)*block;
-    nextChange.innerText=`Next change at ${next} min`;
+    let next=blocks.find(b=>b.time>seconds/60);
+    if(next) nextChange.innerText=`Next change at ${next.time} min`;
 
   },1000);
 }
