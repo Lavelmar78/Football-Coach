@@ -18,8 +18,8 @@ header{
   color:white;
   padding:14px;
   text-align:center;
-  font-weight:700;
   font-size:20px;
+  font-weight:700;
 }
 
 .screen{
@@ -41,18 +41,19 @@ header{
 
 input,select,button{
   width:100%;
+  box-sizing:border-box;
   padding:10px;
   margin-top:6px;
   margin-bottom:10px;
   border-radius:8px;
   border:1px solid #d1d5db;
-  box-sizing:border-box;
   font-size:15px;
 }
 
 button{
   background:#111827;
   color:white;
+  border:none;
   font-weight:600;
 }
 
@@ -72,6 +73,25 @@ button{
   font-size:12px;
 }
 
+.pitch{
+  position:relative;
+  height:420px;
+  background:linear-gradient(#4CAF50,#2E7D32);
+  border-radius:12px;
+  overflow:hidden;
+}
+
+.token{
+  position:absolute;
+  transform:translate(-50%,-50%);
+  background:white;
+  border-radius:10px;
+  padding:6px 8px;
+  font-size:12px;
+  font-weight:700;
+  white-space:nowrap;
+}
+
 .tabbar{
   position:fixed;
   bottom:0;
@@ -87,29 +107,10 @@ button{
   margin:0;
 }
 
-.pitch{
-  position:relative;
-  height:420px;
-  border-radius:12px;
-  background:linear-gradient(#4CAF50,#2E7D32);
-  overflow:hidden;
-}
-
-.token{
-  position:absolute;
-  transform:translate(-50%,-50%);
-  background:white;
-  padding:6px 8px;
-  border-radius:10px;
-  font-size:12px;
-  font-weight:600;
-  white-space:nowrap;
-}
-
 .highlight{
   background:#fef3c7;
-  border-radius:10px;
   padding:12px;
+  border-radius:10px;
   margin-bottom:10px;
   text-align:center;
 }
@@ -121,14 +122,14 @@ button{
   margin:10px 0 20px;
 }
 
-.small{
-  font-size:13px;
-  color:#6b7280;
-}
-
 .planBlock{
   border-bottom:1px solid #e5e7eb;
   padding:10px 0;
+}
+
+.small{
+  font-size:13px;
+  color:#6b7280;
 }
 </style>
 </head>
@@ -153,11 +154,15 @@ button{
  Goalkeepers play full match (1 half GK / 1 half outfield)
 </label>
 
-<button onclick="renderPlayers()">Build Squad Inputs</button>
+<button onclick="renderPlayers()">
+Build Squad Inputs
+</button>
 
 <div id="playersContainer"></div>
 
-<button onclick="saveSquad()">Save Squad</button>
+<button onclick="saveSquad()">
+Save Squad
+</button>
 
 <h3>Goalkeepers</h3>
 
@@ -172,6 +177,7 @@ Generate Match Plan
 </button>
 
 </div>
+
 </div>
 
 <!-- PLAN -->
@@ -204,7 +210,7 @@ Next change:
 </div>
 
 <div class="highlight" id="nextSub">
-Upcoming subs
+Upcoming subs:
 </div>
 
 <button onclick="startMatch()">Start Match</button>
@@ -214,7 +220,7 @@ Upcoming subs
 
 </div>
 
-<!-- TABS -->
+<!-- NAV -->
 <div class="tabbar">
 <button onclick="showTab('setup')">Setup</button>
 <button onclick="showTab('plan')">Plan</button>
@@ -230,16 +236,6 @@ let currentIndex = 0;
 let timer = null;
 let seconds = 0;
 
-const POSITIONS = [
-  "gk",
-  "def",
-  "def",
-  "midc",
-  "midc",
-  "midw",
-  "att"
-];
-
 function val(id){
   return document.getElementById(id)?.value || "";
 }
@@ -249,18 +245,19 @@ function chk(id){
 }
 
 function showTab(id){
-  document.querySelectorAll(".screen")
+
+  document
+    .querySelectorAll(".screen")
     .forEach(s=>s.classList.remove("active"));
 
-  document.getElementById(id)
+  document
+    .getElementById(id)
     .classList.add("active");
 }
 
-/* PLAYERS UI */
+/* PLAYERS */
 
 function renderPlayers(){
-
-  const container = document.getElementById("playersContainer");
 
   const saved = JSON.parse(
     localStorage.getItem("coachSquad") || "[]"
@@ -294,22 +291,38 @@ function renderPlayers(){
       <div class="roles">
 
         <label>
-          <input type="checkbox" id="def${i}" ${p.def ? "checked":""}>
+          <input
+            type="checkbox"
+            id="def${i}"
+            ${p.def ? "checked" : ""}
+          >
           DEF
         </label>
 
         <label>
-          <input type="checkbox" id="midc${i}" ${p.midc ? "checked":""}>
+          <input
+            type="checkbox"
+            id="midc${i}"
+            ${p.midc ? "checked" : ""}
+          >
           MID-C
         </label>
 
         <label>
-          <input type="checkbox" id="midw${i}" ${p.midw ? "checked":""}>
+          <input
+            type="checkbox"
+            id="midw${i}"
+            ${p.midw ? "checked" : ""}
+          >
           MID-W
         </label>
 
         <label>
-          <input type="checkbox" id="att${i}" ${p.att ? "checked":""}>
+          <input
+            type="checkbox"
+            id="att${i}"
+            ${p.att ? "checked" : ""}
+          >
           ATT
         </label>
 
@@ -319,7 +332,9 @@ function renderPlayers(){
     `;
   }
 
-  container.innerHTML = html;
+  document
+    .getElementById("playersContainer")
+    .innerHTML = html;
 
   updateGKSelectors();
 }
@@ -358,7 +373,9 @@ function updateGKSelectors(){
 
     if(!name) continue;
 
-    html += `<option>${name}</option>`;
+    html += `
+    <option>${name}</option>
+    `;
   }
 
   document.getElementById("gk1").innerHTML = html;
@@ -388,75 +405,52 @@ function generatePlan(){
     });
   }
 
-  const matchLength = Number(val("matchLength"));
+  const matchLength =
+    Number(val("matchLength"));
 
-  const half = matchLength / 2;
+  const half =
+    matchLength / 2;
 
-  const gk1 = playersData.find(
-    p=>p.name===val("gk1")
-  );
-
-  const gk2 = playersData.find(
-    p=>p.name===val("gk2")
-  );
-
-  const outfieldSlots = 6;
-
-  const totalOutfieldMinutes =
-    matchLength * outfieldSlots;
-
-  const nonKeeperPlayers =
-    playersData.filter(
-      p=>p!==gk1 && p!==gk2
+  const gk1 =
+    playersData.find(
+      p=>p.name===val("gk1")
     );
 
-  const keeperOutfieldMinutes =
-    half * 2;
+  const gk2 =
+    playersData.find(
+      p=>p.name===val("gk2")
+    );
 
-  const remainingMinutes =
-    totalOutfieldMinutes - keeperOutfieldMinutes;
+  // total slots on pitch
+  const totalPitchMinutes =
+    matchLength * 7;
 
   const baseTarget =
     Math.floor(
-      remainingMinutes /
-      nonKeeperPlayers.length
+      totalPitchMinutes /
+      playersData.length
     );
 
   let remainder =
-    remainingMinutes %
-    nonKeeperPlayers.length;
+    totalPitchMinutes %
+    playersData.length;
 
-  nonKeeperPlayers
+  playersData
     .sort(()=>Math.random()-0.5)
     .forEach(p=>{
+
       p.target =
         baseTarget +
         (remainder-- > 0 ? 1 : 0);
     });
 
-  if(chk("gkMode")){
-
-    gk1.target = half;
-    gk2.target = half;
-  }
-
+  // FEWEST POSSIBLE SUB WINDOWS
   let block = 13;
 
-  if(matchLength % 10 === 0){
-    block = 10;
-  }
-
-  if(matchLength % 8 === 0){
-    block = 8;
-  }
-
-  if(matchLength % 7 === 0){
-    block = 7;
-  }
-
-  if(matchLength % 6 === 0){
-    block = 6;
-  }
+  if(matchLength % 10 === 0) block = 10;
+  if(matchLength % 8 === 0) block = 8;
+  if(matchLength % 7 === 0) block = 7;
+  if(matchLength % 6 === 0) block = 6;
 
   const totalBlocks =
     matchLength / block;
@@ -465,40 +459,33 @@ function generatePlan(){
 
   for(let b=0;b<totalBlocks;b++){
 
-    const start = b * block;
-    const end = start + block;
+    const start =
+      b * block;
+
+    const end =
+      start + block;
 
     const currentGK =
-      start < half ? gk1 : gk2;
+      start < half
+      ? gk1
+      : gk2;
 
-    const lineup = [currentGK];
+    const lineup = [];
+    const used = new Set();
 
-    const pool =
-      playersData.filter(
-        p=>p!==currentGK
-      );
+    // GK
+    lineup.push(currentGK);
+    used.add(currentGK.name);
 
     function choose(role){
 
       let eligible =
-        pool.filter(p=>{
+        playersData.filter(p=>{
 
-          if(lineup.includes(p))
+          if(used.has(p.name))
             return false;
 
-          if(chk("gkMode")){
-
-            if(
-              start < half &&
-              p===gk2
-            ) return false;
-
-            if(
-              start >= half &&
-              p===gk1
-            ) return false;
-          }
-
+          // POSITION FILTERS
           if(role==="def")
             return p.positions.def;
 
@@ -514,41 +501,48 @@ function generatePlan(){
           return true;
         });
 
+      // fallback
       if(!eligible.length){
 
         eligible =
-          pool.filter(
-            p=>!lineup.includes(p)
+          playersData.filter(
+            p=>!used.has(p.name)
           );
       }
 
+      // SORT BY DEFICIT
       eligible.sort((a,b)=>{
 
-        const needA =
+        const deficitA =
           a.target - a.minutes;
 
-        const needB =
+        const deficitB =
           b.target - b.minutes;
 
-        if(needB===needA)
+        if(deficitB===deficitA){
           return Math.random()-0.5;
+        }
 
-        return needB - needA;
+        return deficitB - deficitA;
       });
 
-      return eligible[0];
+      const chosen = eligible[0];
+
+      used.add(chosen.name);
+
+      return chosen;
     }
 
-    POSITIONS.forEach(pos=>{
+    // formation
+    lineup.push(choose("def"));
+    lineup.push(choose("def"));
 
-      if(pos==="gk") return;
+    lineup.push(choose("midc"));
+    lineup.push(choose("midc"));
 
-      const player = choose(pos);
+    lineup.push(choose("midw"));
 
-      if(player){
-        lineup.push(player);
-      }
-    });
+    lineup.push(choose("att"));
 
     lineup.forEach(p=>{
       p.minutes += block;
@@ -562,7 +556,10 @@ function generatePlan(){
 
   buildPlan();
   buildMinutes();
-  drawPitch(blocks[0].lineup);
+
+  if(blocks[0]){
+    drawPitch(blocks[0].lineup);
+  }
 
   currentIndex = 0;
 
@@ -581,13 +578,18 @@ function buildPlan(){
 
     html += `
     <div class="planBlock">
+
       <strong>${block.time}m</strong><br>
-      ${block.lineup.map(p=>p.name).join(", ")}
+
+      ${block.lineup
+        .map(p=>p.name)
+        .join(", ")}
     `;
 
     if(i>0){
 
-      const prev = blocks[i-1];
+      const prev =
+        blocks[i-1];
 
       const off =
         prev.lineup.filter(
@@ -601,9 +603,15 @@ function buildPlan(){
 
       html += `
       <div class="small">
-      OFF ${off.map(p=>p.name).join(", ")}
-      →
-      ON ${on.map(p=>p.name).join(", ")}
+
+      OFF:
+      ${off.map(p=>p.name).join(", ")}
+
+      <br>
+
+      ON:
+      ${on.map(p=>p.name).join(", ")}
+
       </div>
       `;
     }
@@ -611,8 +619,9 @@ function buildPlan(){
     html += `</div>`;
   }
 
-  document.getElementById("planTable").innerHTML =
-    html;
+  document
+    .getElementById("planTable")
+    .innerHTML = html;
 }
 
 /* MINUTES */
@@ -632,7 +641,8 @@ function buildMinutes(){
       `;
     });
 
-  document.getElementById("minutesTable")
+  document
+    .getElementById("minutesTable")
     .innerHTML = html;
 }
 
@@ -696,12 +706,15 @@ function updateNextSub(){
       p=>!current.lineup.includes(p)
     );
 
-  document.getElementById("nextSub")
+  document
+    .getElementById("nextSub")
     .innerHTML =
     `
     OFF:
     ${off.map(p=>p.name).join(", ")}
+
     <br>
+
     ON:
     ${on.map(p=>p.name).join(", ")}
     `;
@@ -725,7 +738,8 @@ function startMatch(){
       .toString()
       .padStart(2,"0");
 
-    document.getElementById("clock")
+    document
+      .getElementById("clock")
       .innerText =
       `${mins}:${secs}`;
 
@@ -736,7 +750,8 @@ function startMatch(){
 
     if(next){
 
-      document.getElementById("nextChange")
+      document
+        .getElementById("nextChange")
         .innerText =
         `Next change: ${next.time} mins`;
     }
@@ -745,7 +760,9 @@ function startMatch(){
 }
 
 function pauseMatch(){
+
   clearInterval(timer);
+
   timer = null;
 }
 
@@ -755,7 +772,8 @@ function resetMatch(){
 
   seconds = 0;
 
-  document.getElementById("clock")
+  document
+    .getElementById("clock")
     .innerText = "00:00";
 }
 
@@ -763,7 +781,7 @@ function nextBlock(){
 
   currentIndex++;
 
-  if(currentIndex>=blocks.length)
+  if(currentIndex >= blocks.length)
     return;
 
   drawPitch(
