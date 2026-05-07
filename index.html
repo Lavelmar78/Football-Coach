@@ -382,42 +382,6 @@ function updateGKSelectors(){
   gk2.innerHTML=html;
 }
 
-function buildWindows(matchLength, playersNeedingRotation){
-
-  const totalOutfieldMinutes=
-    matchLength * 6;
-
-  const target=
-    totalOutfieldMinutes / playersNeedingRotation;
-
-  let blockCount=
-    Math.round(target / 8);
-
-  blockCount=Math.max(2,blockCount);
-
-  const windows=[];
-
-  const base=
-    Math.floor(matchLength / blockCount);
-
-  let remainder=
-    matchLength % blockCount;
-
-  for(let i=0;i<blockCount;i++){
-
-    let size=base;
-
-    if(remainder>0){
-      size++;
-      remainder--;
-    }
-
-    windows.push(size);
-  }
-
-  return windows;
-}
-
 function shuffle(arr){
 
   const a=[...arr];
@@ -446,7 +410,7 @@ function generatePlan(){
     Number(val("matchLength"));
 
   if(matchLength<=0){
-    showError("Match length must be greater than 0");
+    showError("Invalid match length");
     return;
   }
 
@@ -454,8 +418,7 @@ function generatePlan(){
 
     if(!chk("avail"+i)) continue;
 
-    const name=
-      val("p"+i).trim();
+    const name=val("p"+i).trim();
 
     if(!name) continue;
 
@@ -463,7 +426,6 @@ function generatePlan(){
       name,
       totalMinutes:0,
       outfieldMinutes:0,
-      appearances:0,
       positions:{
         def:chk("def"+i),
         midc:chk("midc"+i),
@@ -474,7 +436,7 @@ function generatePlan(){
   }
 
   if(playersData.length<7){
-    showError("Need at least 7 available players");
+    showError("Need at least 7 players");
     return;
   }
 
@@ -494,63 +456,119 @@ function generatePlan(){
   }
 
   if(gk1Player===gk2Player){
-    showError("Keepers must be different");
+    showError("Keepers must differ");
     return;
   }
 
-  blocks=[];
-
-  const fixedGK=
+  const fixedGKMode=
     chk("gkMode");
 
-  const outfieldPool=
-    fixedGK
+  blocks=[];
+
+  playersData.forEach(p=>{
+    p.totalMinutes=0;
+    p.outfieldMinutes=0;
+  });
+
+  const halfLength=
+    matchLength/2;
+
+  const rotatingPlayers=
+    fixedGKMode
     ? playersData.filter(
         p=>p!==gk1Player &&
            p!==gk2Player
       )
     : [...playersData];
 
-  const windows=
-    buildWindows(
-      matchLength,
-      outfieldPool.length
-    );
-
   const totalOutfieldMinutes=
     matchLength * 6;
 
-  const reservedKeeperMinutes=
-    fixedGK ? matchLength : 0;
+  const reservedGKMinutes=
+    fixedGKMode
+    ? matchLength
+    : 0;
 
-  const targetOutfield=
-    (
-      totalOutfieldMinutes -
-      reservedKeeperMinutes
-    ) / outfieldPool.length;
+  const distributableMinutes=
+    totalOutfieldMinutes -
+    reservedGKMinutes;
 
-  let cumulativeTime=0;
+  const exactTarget=
+    distributableMinutes /
+    rotatingPlayers.length;
 
-  function fairnessSort(pool){
+  const desiredBlocks=
+    Math.max(
+      3,
+      Math.round(matchLength/10)
+    );
 
-    return shuffle(pool).sort((a,b)=>{
+  const windows=[];
 
-      const da=
-        targetOutfield -
-        a.outfieldMinutes;
+  let remaining=
+    matchLength;
 
-      const db=
-        targetOutfield -
-        b.outfieldMinutes;
+  for(let i=0;i<desiredBlocks;i++){
 
-      return db-da;
-    });
+    const remainingBlocks=
+      desiredBlocks-i;
+
+    const block=
+      Math.round(
+        remaining /
+        remainingBlocks
+      );
+
+    windows.push(block);
+
+    remaining-=block;
   }
 
-  function pickRole(pool,role){
+  const cumulative=[];
 
-    const filtered=
-      pool.filter(p=>{
+  let running=0;
+
+  windows.forEach(w=>{
+    running+=w;
+    cumulative.push(running);
+  });
+
+  const floorTarget=
+    Math.floor(exactTarget);
+
+  const ceilTarget=
+    Math.ceil(exactTarget);
+
+  const extraPlayers=
+    distributableMinutes -
+    (
+      floorTarget *
+      rotatingPlayers.length
+    );
+
+  rotatingPlayers.forEach((p,index)=>{
+
+    p.targetMinutes=
+      index < extraPlayers
+      ? ceilTarget
+      : floorTarget;
+  });
+
+  function need(player){
+
+    return (
+      player.targetMinutes -
+      player.outfieldMinutes
+    );
+  }
+
+  function pick(role,used){
+
+    let pool=
+      rotatingPlayers.filter(p=>{
+
+        if(used.has(p.name))
+          return false;
 
         if(role==="any")
           return true;
@@ -558,109 +576,160 @@ function generatePlan(){
         return p.positions[role];
       });
 
-    if(filtered.length){
-      return filtered[0];
-    }
+    pool=
+      shuffle(pool)
+      .sort((a,b)=>
+        need(b)-need(a)
+      );
 
     return pool[0];
   }
 
-  windows.forEach((windowSize,index)=>{
+  let previousLineup=[];
 
-    cumulativeTime+=windowSize;
+  cumulative.forEach((time,index)=>{
+
+    const blockMinutes=
+      windows[index];
 
     const lineup=[];
 
-    const half=
-      cumulativeTime <= matchLength/2
-      ? 1
-      : 2;
+    const used=
+      new Set();
 
     const activeGK=
-      half===1
+      time<=halfLength
       ? gk1Player
       : gk2Player;
 
-    const offGK=
-      half===1
+    const offGoalGK=
+      time<=halfLength
       ? gk2Player
       : gk1Player;
 
     lineup.push(activeGK);
 
-    const available=
-      fairnessSort(
-        outfieldPool.filter(
-          p=>p!==activeGK
-        )
-      );
+    used.add(activeGK.name);
 
-    const selected=[];
+    if(fixedGKMode){
 
-    if(fixedGK){
+      lineup.push(offGoalGK);
 
-      selected.push(offGK);
+      used.add(offGoalGK.name);
     }
 
-    const roles=[
+    const rolePlan=[
       "midc",
       "def",
       "def",
       "midw",
       "att",
-      "midc"
+      "any"
     ];
 
-    const required=
-      fixedGK ? 5 : 6;
+    const outfieldNeeded=
+      fixedGKMode
+      ? 5
+      : 6;
 
-    for(let i=0;i<required;i++){
+    for(let i=0;i<outfieldNeeded;i++){
 
-      const role=roles[i];
-
-      const candidate=
-        pickRole(
-          available.filter(
-            p=>!selected.includes(p)
-          ),
-          role
+      const picked=
+        pick(
+          rolePlan[i],
+          used
         );
 
-      if(candidate){
+      if(!picked){
 
-        selected.push(candidate);
+        showError(
+          "Could not satisfy positions"
+        );
+
+        return;
+      }
+
+      lineup.push(picked);
+
+      used.add(picked.name);
+    }
+
+    if(index>0){
+
+      const overlap=
+        lineup.filter(
+          p=>previousLineup.includes(p)
+        ).length;
+
+      if(overlap>=6){
+
+        const alternatives=
+          rotatingPlayers
+          .filter(
+            p=>!lineup.includes(p)
+          )
+          .sort((a,b)=>
+            need(b)-need(a)
+          );
+
+        if(alternatives.length){
+
+          lineup[lineup.length-1]=
+            alternatives[0];
+        }
       }
     }
 
-    selected.forEach(p=>{
-      lineup.push(p);
-    });
-
-    // exact accounting pass
     lineup.forEach(player=>{
 
-      player.totalMinutes+=windowSize;
+      player.totalMinutes+=
+        blockMinutes;
 
       if(player!==activeGK){
 
-        player.outfieldMinutes+=windowSize;
+        player.outfieldMinutes+=
+          blockMinutes;
       }
-
-      player.appearances++;
     });
 
     blocks.push({
-      time:cumulativeTime,
+      time,
       lineup
     });
 
+    previousLineup=[...lineup];
   });
+
+  while(blocks.length>1){
+
+    const last=
+      blocks[blocks.length-1];
+
+    const prev=
+      blocks[blocks.length-2];
+
+    const changes=
+      last.lineup.filter(
+        p=>!prev.lineup.includes(p)
+      ).length;
+
+    if(changes===0){
+
+      blocks.pop();
+
+    }else{
+      break;
+    }
+  }
 
   buildPlan();
   buildMinutes();
 
   if(blocks.length){
-    drawPitch(blocks[0].lineup);
+
+    drawPitch(
+      blocks[0].lineup
+    );
   }
 
   currentIndex=0;
@@ -672,7 +741,6 @@ function buildPlan(){
 
   let html="";
 
-  // kickoff lineup
   if(blocks.length){
 
     html+=`
