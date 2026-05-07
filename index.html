@@ -151,7 +151,7 @@ button{
 
 <label>
 <input type="checkbox" id="gkMode" checked>
- Active GK plays FULL match
+ Keepers play full match
 </label>
 
 <button onclick="renderPlayers()">
@@ -372,7 +372,7 @@ function updateGKSelectors(){
   document.getElementById("gk2").innerHTML = html;
 }
 
-/* ENGINE */
+/* OPTIMIZER ENGINE */
 
 function generatePlan(){
 
@@ -410,52 +410,74 @@ function generatePlan(){
       p=>p.name===val("gk2")
     );
 
-  // FULL MATCH BLOCKS
-  const totalBlocks = 4;
-  const block = matchLength / totalBlocks;
+  // remove keepers from rotation pool
+  const outfieldPool =
+    playersData.filter(
+      p=>p!==gk1 && p!==gk2
+    );
+
+  // dynamic sub blocks
+  const targetMinutes =
+    (matchLength * 5) /
+    outfieldPool.length;
+
+  // build fair windows
+  let windows = [];
+
+  let remaining = matchLength;
+
+  while(remaining > 0){
+
+    let next = Math.min(
+      8,
+      remaining
+    );
+
+    if(remaining-next < 6 && remaining-next !==0){
+      next = remaining;
+    }
+
+    windows.push(next);
+
+    remaining -= next;
+  }
 
   blocks = [];
 
-  for(let b=0;b<totalBlocks;b++){
+  let currentTime = 0;
 
-    const start = b * block;
-    const end = start + block;
+  windows.forEach((windowSize,index)=>{
 
-    // ACTIVE GK
-    const activeGK =
-      start < half
-      ? gk1
-      : gk2;
+    currentTime += windowSize;
 
     const lineup = [];
     const used = new Set();
 
-    // GK ALWAYS INCLUDED
+    // active GK
+    const activeGK =
+      currentTime <= half
+      ? gk1
+      : gk2;
+
+    const supportGK =
+      currentTime <= half
+      ? gk2
+      : gk1;
+
+    // both keepers ALWAYS play
     lineup.push(activeGK);
+    lineup.push(supportGK);
+
     used.add(activeGK.name);
+    used.add(supportGK.name);
 
     function choose(role){
 
       let eligible =
-        playersData.filter(p=>{
+        outfieldPool.filter(p=>{
 
           if(used.has(p.name))
             return false;
-
-          // OTHER GK PLAYS OUTFIELD
-          // IN OPPOSITE HALF
-          if(chk("gkMode")){
-
-            if(
-              start < half &&
-              p===gk2
-            ) return false;
-
-            if(
-              start >= half &&
-              p===gk1
-            ) return false;
-          }
 
           if(role==="def")
             return p.positions.def;
@@ -472,26 +494,22 @@ function generatePlan(){
           return true;
         });
 
+      // fallback
       if(!eligible.length){
 
         eligible =
-          playersData.filter(
+          outfieldPool.filter(
             p=>!used.has(p.name)
           );
       }
 
+      // LOWEST MINUTES FIRST
       eligible.sort((a,b)=>{
 
-        const aNeed =
-          a.minutes;
-
-        const bNeed =
-          b.minutes;
-
-        if(aNeed===bNeed)
+        if(a.minutes===b.minutes)
           return Math.random()-0.5;
 
-        return aNeed - bNeed;
+        return a.minutes-b.minutes;
       });
 
       const chosen = eligible[0];
@@ -505,21 +523,20 @@ function generatePlan(){
     lineup.push(choose("def"));
 
     lineup.push(choose("midc"));
-    lineup.push(choose("midc"));
 
     lineup.push(choose("midw"));
 
     lineup.push(choose("att"));
 
     lineup.forEach(p=>{
-      p.minutes += block;
+      p.minutes += windowSize;
     });
 
     blocks.push({
-      time:end,
+      time:currentTime,
       lineup
     });
-  }
+  });
 
   buildPlan();
   buildMinutes();
@@ -629,10 +646,10 @@ function drawPitch(lineup){
     [50,90],
     [20,70],
     [80,70],
-    [20,45],
-    [50,45],
-    [80,45],
-    [50,20]
+    [50,60],
+    [20,35],
+    [80,35],
+    [50,18]
   ];
 
   lineup.forEach((p,i)=>{
