@@ -15,9 +15,9 @@ body{
 
 header{
   background:#111827;
-  color:white;
-  padding:14px;
+  color:#fff;
   text-align:center;
+  padding:14px;
   font-size:20px;
   font-weight:700;
 }
@@ -32,7 +32,7 @@ header{
 }
 
 .card{
-  background:white;
+  background:#fff;
   border-radius:12px;
   padding:12px;
   margin-bottom:12px;
@@ -76,9 +76,9 @@ button{
 .pitch{
   position:relative;
   height:420px;
-  background:linear-gradient(#4CAF50,#2E7D32);
   border-radius:12px;
   overflow:hidden;
+  background:linear-gradient(#4CAF50,#2E7D32);
 }
 
 .token{
@@ -97,7 +97,7 @@ button{
   bottom:0;
   width:100%;
   display:flex;
-  background:white;
+  background:#fff;
   border-top:1px solid #d1d5db;
 }
 
@@ -117,8 +117,8 @@ button{
 
 .timer{
   font-size:42px;
-  font-weight:700;
   text-align:center;
+  font-weight:700;
   margin:10px 0 20px;
 }
 
@@ -151,7 +151,7 @@ button{
 
 <label>
 <input type="checkbox" id="gkMode" checked>
- Goalkeepers play full match (1 half GK / 1 half outfield)
+ Active GK plays FULL match
 </label>
 
 <button onclick="renderPlayers()">
@@ -291,38 +291,30 @@ function renderPlayers(){
       <div class="roles">
 
         <label>
-          <input
-            type="checkbox"
+          <input type="checkbox"
             id="def${i}"
-            ${p.def ? "checked" : ""}
-          >
+            ${p.def ? "checked":""}>
           DEF
         </label>
 
         <label>
-          <input
-            type="checkbox"
+          <input type="checkbox"
             id="midc${i}"
-            ${p.midc ? "checked" : ""}
-          >
+            ${p.midc ? "checked":""}>
           MID-C
         </label>
 
         <label>
-          <input
-            type="checkbox"
+          <input type="checkbox"
             id="midw${i}"
-            ${p.midw ? "checked" : ""}
-          >
+            ${p.midw ? "checked":""}>
           MID-W
         </label>
 
         <label>
-          <input
-            type="checkbox"
+          <input type="checkbox"
             id="att${i}"
-            ${p.att ? "checked" : ""}
-          >
+            ${p.att ? "checked":""}>
           ATT
         </label>
 
@@ -373,9 +365,7 @@ function updateGKSelectors(){
 
     if(!name) continue;
 
-    html += `
-    <option>${name}</option>
-    `;
+    html += `<option>${name}</option>`;
   }
 
   document.getElementById("gk1").innerHTML = html;
@@ -394,8 +384,7 @@ function generatePlan(){
 
     playersData.push({
       name: val("p"+i),
-      minutes: 0,
-      target: 0,
+      minutes:0,
       positions:{
         def: chk("def"+i),
         midc: chk("midc"+i),
@@ -421,51 +410,19 @@ function generatePlan(){
       p=>p.name===val("gk2")
     );
 
-  // total slots on pitch
-  const totalPitchMinutes =
-    matchLength * 7;
-
-  const baseTarget =
-    Math.floor(
-      totalPitchMinutes /
-      playersData.length
-    );
-
-  let remainder =
-    totalPitchMinutes %
-    playersData.length;
-
-  playersData
-    .sort(()=>Math.random()-0.5)
-    .forEach(p=>{
-
-      p.target =
-        baseTarget +
-        (remainder-- > 0 ? 1 : 0);
-    });
-
-  // FEWEST POSSIBLE SUB WINDOWS
-  let block = 13;
-
-  if(matchLength % 10 === 0) block = 10;
-  if(matchLength % 8 === 0) block = 8;
-  if(matchLength % 7 === 0) block = 7;
-  if(matchLength % 6 === 0) block = 6;
-
-  const totalBlocks =
-    matchLength / block;
+  // FULL MATCH BLOCKS
+  const totalBlocks = 4;
+  const block = matchLength / totalBlocks;
 
   blocks = [];
 
   for(let b=0;b<totalBlocks;b++){
 
-    const start =
-      b * block;
+    const start = b * block;
+    const end = start + block;
 
-    const end =
-      start + block;
-
-    const currentGK =
+    // ACTIVE GK
+    const activeGK =
       start < half
       ? gk1
       : gk2;
@@ -473,9 +430,9 @@ function generatePlan(){
     const lineup = [];
     const used = new Set();
 
-    // GK
-    lineup.push(currentGK);
-    used.add(currentGK.name);
+    // GK ALWAYS INCLUDED
+    lineup.push(activeGK);
+    used.add(activeGK.name);
 
     function choose(role){
 
@@ -485,7 +442,21 @@ function generatePlan(){
           if(used.has(p.name))
             return false;
 
-          // POSITION FILTERS
+          // OTHER GK PLAYS OUTFIELD
+          // IN OPPOSITE HALF
+          if(chk("gkMode")){
+
+            if(
+              start < half &&
+              p===gk2
+            ) return false;
+
+            if(
+              start >= half &&
+              p===gk1
+            ) return false;
+          }
+
           if(role==="def")
             return p.positions.def;
 
@@ -501,7 +472,6 @@ function generatePlan(){
           return true;
         });
 
-      // fallback
       if(!eligible.length){
 
         eligible =
@@ -510,20 +480,18 @@ function generatePlan(){
           );
       }
 
-      // SORT BY DEFICIT
       eligible.sort((a,b)=>{
 
-        const deficitA =
-          a.target - a.minutes;
+        const aNeed =
+          a.minutes;
 
-        const deficitB =
-          b.target - b.minutes;
+        const bNeed =
+          b.minutes;
 
-        if(deficitB===deficitA){
+        if(aNeed===bNeed)
           return Math.random()-0.5;
-        }
 
-        return deficitB - deficitA;
+        return aNeed - bNeed;
       });
 
       const chosen = eligible[0];
@@ -533,7 +501,6 @@ function generatePlan(){
       return chosen;
     }
 
-    // formation
     lineup.push(choose("def"));
     lineup.push(choose("def"));
 
@@ -584,6 +551,7 @@ function buildPlan(){
       ${block.lineup
         .map(p=>p.name)
         .join(", ")}
+
     `;
 
     if(i>0){
@@ -616,7 +584,9 @@ function buildPlan(){
       `;
     }
 
-    html += `</div>`;
+    html += `
+    </div>
+    `;
   }
 
   document
