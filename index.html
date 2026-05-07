@@ -161,7 +161,7 @@ button{
 
 <label>
 <input type="checkbox" id="gkMode" checked>
- Keepers play full match
+ Keep off-goal GK fixed outfield
 </label>
 
 <button onclick="renderPlayers()">
@@ -441,69 +441,123 @@ function generatePlan(){
     );
 
   if(!gk1p || !gk2p){
-    showError("Please select both goalkeepers");
+    showError("Select both keepers");
+    return;
+  }
+
+  if(gk1p===gk2p){
+    showError("Keepers must be different");
     return;
   }
 
   const half=matchLength/2;
 
-  // variable windows without crossing halftime
   let windows=[];
 
-  let firstHalf=0;
+  function buildHalfWindows(halfLen){
 
-  while(firstHalf<half){
+    let arr=[];
+    let total=0;
 
-    let block=Math.min(
-      8,
-      half-firstHalf
-    );
+    while(total<halfLen){
 
-    if((half-firstHalf)-block<6 && (half-firstHalf)-block!==0){
-      block=half-firstHalf;
+      let block=Math.min(8,halfLen-total);
+
+      if((halfLen-total)-block<6 && (halfLen-total)-block!==0){
+        block=halfLen-total;
+      }
+
+      arr.push(block);
+
+      total+=block;
     }
 
-    windows.push(block);
-
-    firstHalf+=block;
+    return arr;
   }
 
-  let secondHalf=0;
-
-  while(secondHalf<half){
-
-    let block=Math.min(
-      8,
-      half-secondHalf
-    );
-
-    if((half-secondHalf)-block<6 && (half-secondHalf)-block!==0){
-      block=half-secondHalf;
-    }
-
-    windows.push(block);
-
-    secondHalf+=block;
-  }
+  windows=[
+    ...buildHalfWindows(half),
+    ...buildHalfWindows(half)
+  ];
 
   blocks=[];
 
-  const gkMode=chk("gkMode");
-
-  // outfield pool includes off-goal keeper
-  const everyone=
-    [...playersData];
+  const fixedGKMode=chk("gkMode");
 
   const totalOutfieldMinutes=
     matchLength * 6;
 
   const targetOutfieldMinutes=
     totalOutfieldMinutes /
-    everyone.length;
+    playersData.length;
 
   let currentTime=0;
 
-  windows.forEach(windowSize=>{
+  function fairnessScore(player){
+
+    const remainingEligibleMinutes=
+      Math.max(
+        1,
+        matchLength-player.outfieldMinutes
+      );
+
+    return (
+      targetOutfieldMinutes -
+      player.outfieldMinutes
+    ) / remainingEligibleMinutes;
+  }
+
+  function choosePlayer({
+    used,
+    rolePriority,
+    activeGK
+  }){
+
+    for(const role of rolePriority){
+
+      let eligible=
+        playersData.filter(p=>{
+
+          if(used.has(p.name))
+            return false;
+
+          if(p===activeGK)
+            return false;
+
+          if(role==="any")
+            return true;
+
+          return p.positions[role];
+        });
+
+      if(eligible.length){
+
+        eligible.sort((a,b)=>{
+
+          const sa=fairnessScore(a);
+          const sb=fairnessScore(b);
+
+          if(sa===sb)
+            return Math.random()-0.5;
+
+          return sb-sa;
+        });
+
+        const chosen=eligible[0];
+
+        used.add(chosen.name);
+
+        return chosen;
+      }
+    }
+
+    return null;
+  }
+
+  windows.forEach((windowSize,index)=>{
+
+    const prevBlock=
+      blocks[blocks.length-1];
 
     currentTime+=windowSize;
 
@@ -526,122 +580,100 @@ function generatePlan(){
 
     used.add(activeGK.name);
 
-    const outfieldSlots=[];
+    // fixed outfield GK mode
+    if(fixedGKMode){
 
-    if(gkMode){
+      lineup.push(offGoalGK);
 
-      outfieldSlots.push(offGoalGK);
+      offGoalGK.totalMinutes+=windowSize;
+      offGoalGK.outfieldMinutes+=windowSize;
 
       used.add(offGoalGK.name);
     }
 
-    function scorePlayer(player){
-
-      const remainingEligibleMinutes=
-        Math.max(
-          1,
-          matchLength-player.totalMinutes
-        );
-
-      return (
-        targetOutfieldMinutes -
-        player.outfieldMinutes
-      ) / remainingEligibleMinutes;
-    }
-
-    function choose(roleTier){
-
-      for(const role of roleTier){
-
-        let eligible=
-          everyone.filter(p=>{
-
-            if(used.has(p.name))
-              return false;
-
-            if(p===activeGK)
-              return false;
-
-            if(role==="any")
-              return true;
-
-            return p.positions[role];
-          });
-
-        if(eligible.length){
-
-          eligible.sort((a,b)=>{
-
-            const sa=scorePlayer(a);
-            const sb=scorePlayer(b);
-
-            if(sa===sb)
-              return Math.random()-0.5;
-
-            return sb-sa;
-          });
-
-          const chosen=eligible[0];
-
-          used.add(chosen.name);
-
-          return chosen;
-        }
-      }
-
-      return null;
-    }
-
-    // strict CM first
+    // CM
     const cm=
-      choose(["midc","midw","any"]);
+      choosePlayer({
+        used,
+        rolePriority:["midc","midw","any"],
+        activeGK
+      });
 
     if(!cm){
-      showError("Unable to fill CM role");
+      showError("Could not fill CM");
       return;
     }
 
-    outfieldSlots.push(cm);
+    lineup.push(cm);
 
     // DEF
-    const d1=
-      choose(["def","midc","midw","any"]);
+    const def1=
+      choosePlayer({
+        used,
+        rolePriority:["def","midc","midw","any"],
+        activeGK
+      });
 
-    const d2=
-      choose(["def","midc","midw","any"]);
+    const def2=
+      choosePlayer({
+        used,
+        rolePriority:["def","midc","midw","any"],
+        activeGK
+      });
 
-    // WIDE
-    const w1=
-      choose(["midw","midc","att","any"]);
-
-    const w2=
-      choose(["midw","midc","att","any"]);
+    // MID-W
+    const midw=
+      choosePlayer({
+        used,
+        rolePriority:["midw","midc","att","any"],
+        activeGK
+      });
 
     // ATT
     const att=
-      choose(["att","midw","midc","any"]);
+      choosePlayer({
+        used,
+        rolePriority:["att","midw","midc","any"],
+        activeGK
+      });
 
-    const rolePlayers=[
-      d1,d2,w1,w2,att
+    // FLEX
+    const flex=
+      choosePlayer({
+        used,
+        rolePriority:["midc","midw","def","att","any"],
+        activeGK
+      });
+
+    const outfielders=[
+      def1,
+      def2,
+      midw,
+      att,
+      flex
     ];
 
-    for(const p of rolePlayers){
+    for(const p of outfielders){
 
       if(!p){
-        showError("Could not complete valid lineup");
+        showError("Could not complete lineup");
         return;
       }
 
-      outfieldSlots.push(p);
+      lineup.push(p);
     }
 
-    outfieldSlots.forEach(p=>{
+    lineup.forEach(p=>{
 
-      p.totalMinutes+=windowSize;
+      if(p!==activeGK){
 
-      p.outfieldMinutes+=windowSize;
+        p.outfieldMinutes+=windowSize;
+      }
 
-      lineup.push(p);
+      if(p!==activeGK){
+
+        p.totalMinutes+=windowSize;
+      }
     });
 
     blocks.push({
@@ -655,6 +687,7 @@ function generatePlan(){
   buildMinutes();
 
   if(blocks[0]){
+
     drawPitch(blocks[0].lineup);
   }
 
@@ -684,37 +717,42 @@ function buildPlan(){
 
     `;
 
-    if(i>0){
+    const prev=
+      i===0
+      ? { lineup:[] }
+      : blocks[i-1];
 
-      const prev=
-        blocks[i-1];
+    const off=
+      prev.lineup.filter(
+        p=>!block.lineup.includes(p)
+      );
 
-      const off=
-        prev.lineup.filter(
-          p=>!block.lineup.includes(p)
-        );
+    const on=
+      block.lineup.filter(
+        p=>!prev.lineup.includes(p)
+      );
 
-      const on=
-        block.lineup.filter(
-          p=>!prev.lineup.includes(p)
-        );
+    html+=`
+    <div class="small">
 
-      html+=`
-      <div class="small">
+    OFF:
+    ${off.length
+      ? off.map(p=>p.name).join(", ")
+      : "None"}
 
-      OFF:
-      ${off.map(p=>p.name).join(", ")}
+    <br>
 
-      <br>
+    ON:
+    ${on.length
+      ? on.map(p=>p.name).join(", ")
+      : "None"}
 
-      ON:
-      ${on.map(p=>p.name).join(", ")}
+    </div>
+    `;
 
-      </div>
-      `;
-    }
-
-    html+=`</div>`;
+    html+=`
+    </div>
+    `;
   }
 
   planTable.innerHTML=html;
@@ -791,8 +829,13 @@ function drawPitch(lineup){
 
 function updateNextSub(){
 
-  if(!blocks[currentIndex+1])
+  if(!blocks[currentIndex+1]){
+
+    nextSub.innerHTML=
+      "Upcoming subs: none";
+
     return;
+  }
 
   const current=
     blocks[currentIndex];
@@ -813,12 +856,16 @@ function updateNextSub(){
   nextSub.innerHTML=
   `
   OFF:
-  ${off.map(p=>p.name).join(", ")}
+  ${off.length
+    ? off.map(p=>p.name).join(", ")
+    : "None"}
 
   <br>
 
   ON:
-  ${on.map(p=>p.name).join(", ")}
+  ${on.length
+    ? on.map(p=>p.name).join(", ")
+    : "None"}
   `;
 }
 
@@ -877,8 +924,15 @@ function nextBlock(){
 
   currentIndex++;
 
-  if(currentIndex>=blocks.length)
+  if(currentIndex>=blocks.length){
+
+    currentIndex=
+      blocks.length-1;
+
+    updateNextSub();
+
     return;
+  }
 
   drawPitch(
     blocks[currentIndex].lineup
