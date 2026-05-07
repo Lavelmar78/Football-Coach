@@ -131,6 +131,14 @@ button{
   font-weight:700;
   margin:10px 0 20px;
 }
+
+.error{
+  background:#fee2e2;
+  color:#991b1b;
+  padding:10px;
+  border-radius:10px;
+  margin-bottom:10px;
+}
 </style>
 </head>
 
@@ -142,6 +150,8 @@ button{
 <div id="setup" class="screen active">
 
 <div class="card">
+
+<div id="errorBox"></div>
 
 <label>Match Length (mins)</label>
 <input id="matchLength" type="number" value="52">
@@ -232,7 +242,6 @@ Upcoming subs:
 let playersData=[];
 let blocks=[];
 let currentIndex=0;
-
 let timer=null;
 let seconds=0;
 
@@ -242,6 +251,14 @@ function val(id){
 
 function chk(id){
   return document.getElementById(id)?.checked || false;
+}
+
+function showError(msg){
+  errorBox.innerHTML=`<div class="error">${msg}</div>`;
+}
+
+function clearError(){
+  errorBox.innerHTML="";
 }
 
 function showTab(id){
@@ -325,9 +342,7 @@ function renderPlayers(){
     `;
   }
 
-  document
-    .getElementById("playersContainer")
-    .innerHTML=html;
+  playersContainer.innerHTML=html;
 
   updateGKSelectors();
 }
@@ -366,9 +381,7 @@ function updateGKSelectors(){
 
     if(!name) continue;
 
-    html+=`
-    <option>${name}</option>
-    `;
+    html+=`<option>${name}</option>`;
   }
 
   gk1.innerHTML=html;
@@ -379,15 +392,30 @@ function updateGKSelectors(){
 
 function generatePlan(){
 
+  clearError();
+
   playersData=[];
+
+  const matchLength=
+    Number(val("matchLength"));
+
+  if(matchLength<=0){
+    showError("Match length must be greater than 0");
+    return;
+  }
 
   for(let i=0;i<Number(val("count"));i++){
 
     if(!chk("avail"+i)) continue;
 
+    const name=val("p"+i).trim();
+
+    if(!name) continue;
+
     playersData.push({
-      name:val("p"+i),
-      minutes:0,
+      name,
+      totalMinutes:0,
+      outfieldMinutes:0,
       positions:{
         def:chk("def"+i),
         midc:chk("midc"+i),
@@ -397,11 +425,10 @@ function generatePlan(){
     });
   }
 
-  const matchLength=
-    Number(val("matchLength"));
-
-  const half=
-    matchLength/2;
+  if(playersData.length<7){
+    showError("Need at least 7 available named players");
+    return;
+  }
 
   const gk1p=
     playersData.find(
@@ -413,137 +440,212 @@ function generatePlan(){
       p=>p.name===val("gk2")
     );
 
-  const outfieldPool=
-    playersData.filter(
-      p=>p!==gk1p && p!==gk2p
-    );
-
-  // target minutes
-  const totalOutfieldMinutes=
-    matchLength * 5;
-
-  const ideal=
-    totalOutfieldMinutes /
-    outfieldPool.length;
-
-  // variable windows
-  const windows=[7,7,8,7,7,8,8];
-
-  let total=windows.reduce((a,b)=>a+b,0);
-
-  while(total<matchLength){
-
-    windows.push(6);
-    total+=6;
+  if(!gk1p || !gk2p){
+    showError("Please select both goalkeepers");
+    return;
   }
 
-  if(total>matchLength){
+  const half=matchLength/2;
 
-    windows[windows.length-1]-=
-      total-matchLength;
+  // variable windows without crossing halftime
+  let windows=[];
+
+  let firstHalf=0;
+
+  while(firstHalf<half){
+
+    let block=Math.min(
+      8,
+      half-firstHalf
+    );
+
+    if((half-firstHalf)-block<6 && (half-firstHalf)-block!==0){
+      block=half-firstHalf;
+    }
+
+    windows.push(block);
+
+    firstHalf+=block;
+  }
+
+  let secondHalf=0;
+
+  while(secondHalf<half){
+
+    let block=Math.min(
+      8,
+      half-secondHalf
+    );
+
+    if((half-secondHalf)-block<6 && (half-secondHalf)-block!==0){
+      block=half-secondHalf;
+    }
+
+    windows.push(block);
+
+    secondHalf+=block;
   }
 
   blocks=[];
 
-  let current=0;
+  const gkMode=chk("gkMode");
+
+  // outfield pool includes off-goal keeper
+  const everyone=
+    [...playersData];
+
+  const totalOutfieldMinutes=
+    matchLength * 6;
+
+  const targetOutfieldMinutes=
+    totalOutfieldMinutes /
+    everyone.length;
+
+  let currentTime=0;
 
   windows.forEach(windowSize=>{
 
-    current+=windowSize;
+    currentTime+=windowSize;
 
     const lineup=[];
     const used=new Set();
 
     const activeGK=
-      current<=half
+      currentTime<=half
       ? gk1p
       : gk2p;
 
-    const supportGK=
-      current<=half
+    const offGoalGK=
+      currentTime<=half
       ? gk2p
       : gk1p;
 
     lineup.push(activeGK);
-    lineup.push(supportGK);
+
+    activeGK.totalMinutes+=windowSize;
 
     used.add(activeGK.name);
-    used.add(supportGK.name);
 
-    function choose(role){
+    const outfieldSlots=[];
 
-      let eligible=
-        outfieldPool.filter(p=>{
+    if(gkMode){
 
-          if(used.has(p.name))
-            return false;
+      outfieldSlots.push(offGoalGK);
 
-          return p.positions[role];
-        });
-
-      // STRICT fallback order
-      if(!eligible.length && role==="midc"){
-
-        eligible=
-          outfieldPool.filter(p=>
-            !used.has(p.name) &&
-            p.positions.midw
-          );
-      }
-
-      if(!eligible.length && role==="midw"){
-
-        eligible=
-          outfieldPool.filter(p=>
-            !used.has(p.name) &&
-            p.positions.midc
-          );
-      }
-
-      if(!eligible.length){
-
-        eligible=
-          outfieldPool.filter(
-            p=>!used.has(p.name)
-          );
-      }
-
-      eligible.sort((a,b)=>{
-
-        const aGap=
-          ideal-a.minutes;
-
-        const bGap=
-          ideal-b.minutes;
-
-        if(aGap===bGap)
-          return Math.random()-0.5;
-
-        return bGap-aGap;
-      });
-
-      const chosen=eligible[0];
-
-      used.add(chosen.name);
-
-      return chosen;
+      used.add(offGoalGK.name);
     }
 
-    lineup.push(choose("def"));
-    lineup.push(choose("def"));
+    function scorePlayer(player){
 
-    lineup.push(choose("midc"));
+      const remainingEligibleMinutes=
+        Math.max(
+          1,
+          matchLength-player.totalMinutes
+        );
 
-    lineup.push(choose("midw"));
+      return (
+        targetOutfieldMinutes -
+        player.outfieldMinutes
+      ) / remainingEligibleMinutes;
+    }
 
-    lineup.push(choose("att"));
+    function choose(roleTier){
 
-    lineup.forEach(p=>{
-      p.minutes+=windowSize;
+      for(const role of roleTier){
+
+        let eligible=
+          everyone.filter(p=>{
+
+            if(used.has(p.name))
+              return false;
+
+            if(p===activeGK)
+              return false;
+
+            if(role==="any")
+              return true;
+
+            return p.positions[role];
+          });
+
+        if(eligible.length){
+
+          eligible.sort((a,b)=>{
+
+            const sa=scorePlayer(a);
+            const sb=scorePlayer(b);
+
+            if(sa===sb)
+              return Math.random()-0.5;
+
+            return sb-sa;
+          });
+
+          const chosen=eligible[0];
+
+          used.add(chosen.name);
+
+          return chosen;
+        }
+      }
+
+      return null;
+    }
+
+    // strict CM first
+    const cm=
+      choose(["midc","midw","any"]);
+
+    if(!cm){
+      showError("Unable to fill CM role");
+      return;
+    }
+
+    outfieldSlots.push(cm);
+
+    // DEF
+    const d1=
+      choose(["def","midc","midw","any"]);
+
+    const d2=
+      choose(["def","midc","midw","any"]);
+
+    // WIDE
+    const w1=
+      choose(["midw","midc","att","any"]);
+
+    const w2=
+      choose(["midw","midc","att","any"]);
+
+    // ATT
+    const att=
+      choose(["att","midw","midc","any"]);
+
+    const rolePlayers=[
+      d1,d2,w1,w2,att
+    ];
+
+    for(const p of rolePlayers){
+
+      if(!p){
+        showError("Could not complete valid lineup");
+        return;
+      }
+
+      outfieldSlots.push(p);
+    }
+
+    outfieldSlots.forEach(p=>{
+
+      p.totalMinutes+=windowSize;
+
+      p.outfieldMinutes+=windowSize;
+
+      lineup.push(p);
     });
 
     blocks.push({
-      time:current,
+      time:currentTime,
       lineup
     });
 
@@ -612,9 +714,7 @@ function buildPlan(){
       `;
     }
 
-    html+=`
-    </div>
-    `;
+    html+=`</div>`;
   }
 
   planTable.innerHTML=html;
@@ -627,13 +727,26 @@ function buildMinutes(){
   let html="";
 
   playersData
-    .sort((a,b)=>b.minutes-a.minutes)
+    .sort((a,b)=>
+      b.outfieldMinutes-a.outfieldMinutes
+    )
     .forEach(p=>{
 
       html+=`
       <div>
-        ${p.name}: ${p.minutes} mins
+
+      <strong>${p.name}</strong><br>
+
+      Outfield:
+      ${p.outfieldMinutes} mins
+
+      <br>
+
+      Total:
+      ${p.totalMinutes} mins
+
       </div>
+      <hr>
       `;
     });
 
@@ -647,9 +760,9 @@ function drawPitch(lineup){
   pitch.innerHTML="";
 
   const coords=[
-    [50,90],
-    [20,70],
-    [80,70],
+    [50,92],
+    [20,72],
+    [80,72],
     [50,58],
     [20,35],
     [80,35],
