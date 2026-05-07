@@ -15,7 +15,7 @@ body{
 
 header{
   background:#111827;
-  color:#fff;
+  color:white;
   text-align:center;
   padding:14px;
   font-size:20px;
@@ -32,11 +32,11 @@ header{
 }
 
 .card{
-  background:#fff;
-  border-radius:12px;
-  padding:12px;
-  margin-bottom:12px;
-  box-shadow:0 1px 4px rgba(0,0,0,.08);
+  background:white;
+  border-radius:14px;
+  padding:14px;
+  margin-bottom:14px;
+  box-shadow:0 2px 6px rgba(0,0,0,.08);
 }
 
 input,select,button{
@@ -45,7 +45,7 @@ input,select,button{
   padding:10px;
   margin-top:6px;
   margin-bottom:10px;
-  border-radius:8px;
+  border-radius:10px;
   border:1px solid #d1d5db;
   font-size:15px;
 }
@@ -54,7 +54,7 @@ button{
   background:#111827;
   color:white;
   border:none;
-  font-weight:600;
+  font-weight:700;
 }
 
 .player{
@@ -64,7 +64,7 @@ button{
 
 .roles{
   display:flex;
-  gap:10px;
+  gap:12px;
   flex-wrap:wrap;
   margin-top:8px;
 }
@@ -92,19 +92,29 @@ button{
   white-space:nowrap;
 }
 
+.planBlock{
+  border-bottom:1px solid #eee;
+  padding:10px 0;
+}
+
+.small{
+  font-size:13px;
+  color:#666;
+}
+
 .tabbar{
   position:fixed;
   bottom:0;
   width:100%;
   display:flex;
-  background:#fff;
-  border-top:1px solid #d1d5db;
+  background:white;
+  border-top:1px solid #ddd;
 }
 
 .tabbar button{
   flex:1;
-  border-radius:0;
   margin:0;
+  border-radius:0;
 }
 
 .highlight{
@@ -120,16 +130,6 @@ button{
   text-align:center;
   font-weight:700;
   margin:10px 0 20px;
-}
-
-.planBlock{
-  border-bottom:1px solid #e5e7eb;
-  padding:10px 0;
-}
-
-.small{
-  font-size:13px;
-  color:#6b7280;
 }
 </style>
 </head>
@@ -229,12 +229,12 @@ Upcoming subs:
 
 <script>
 
-let playersData = [];
-let blocks = [];
-let currentIndex = 0;
+let playersData=[];
+let blocks=[];
+let currentIndex=0;
 
-let timer = null;
-let seconds = 0;
+let timer=null;
+let seconds=0;
 
 function val(id){
   return document.getElementById(id)?.value || "";
@@ -259,17 +259,18 @@ function showTab(id){
 
 function renderPlayers(){
 
-  const saved = JSON.parse(
-    localStorage.getItem("coachSquad") || "[]"
-  );
+  const saved=
+    JSON.parse(
+      localStorage.getItem("coachSquad") || "[]"
+    );
 
-  let html = "";
+  let html="";
 
   for(let i=0;i<Number(val("count"));i++){
 
-    const p = saved[i] || {};
+    const p=saved[i] || {};
 
-    html += `
+    html+=`
     <div class="player">
 
       <input
@@ -283,7 +284,7 @@ function renderPlayers(){
         <input
           type="checkbox"
           id="avail${i}"
-          ${p.available !== false ? "checked" : ""}
+          ${p.available!==false?"checked":""}
         >
         Available
       </label>
@@ -293,28 +294,28 @@ function renderPlayers(){
         <label>
           <input type="checkbox"
             id="def${i}"
-            ${p.def ? "checked":""}>
+            ${p.def?"checked":""}>
           DEF
         </label>
 
         <label>
           <input type="checkbox"
             id="midc${i}"
-            ${p.midc ? "checked":""}>
+            ${p.midc?"checked":""}>
           MID-C
         </label>
 
         <label>
           <input type="checkbox"
             id="midw${i}"
-            ${p.midw ? "checked":""}>
+            ${p.midw?"checked":""}>
           MID-W
         </label>
 
         <label>
           <input type="checkbox"
             id="att${i}"
-            ${p.att ? "checked":""}>
+            ${p.att?"checked":""}>
           ATT
         </label>
 
@@ -326,24 +327,24 @@ function renderPlayers(){
 
   document
     .getElementById("playersContainer")
-    .innerHTML = html;
+    .innerHTML=html;
 
   updateGKSelectors();
 }
 
 function saveSquad(){
 
-  const squad = [];
+  const squad=[];
 
   for(let i=0;i<Number(val("count"));i++){
 
     squad.push({
-      name: val("p"+i),
-      available: chk("avail"+i),
-      def: chk("def"+i),
-      midc: chk("midc"+i),
-      midw: chk("midw"+i),
-      att: chk("att"+i)
+      name:val("p"+i),
+      available:chk("avail"+i),
+      def:chk("def"+i),
+      midc:chk("midc"+i),
+      midw:chk("midw"+i),
+      att:chk("att"+i)
     });
   }
 
@@ -355,116 +356,114 @@ function saveSquad(){
 
 function updateGKSelectors(){
 
-  let html = "";
+  let html="";
 
   for(let i=0;i<Number(val("count"));i++){
 
     if(!chk("avail"+i)) continue;
 
-    const name = val("p"+i);
+    const name=val("p"+i);
 
     if(!name) continue;
 
-    html += `<option>${name}</option>`;
+    html+=`
+    <option>${name}</option>
+    `;
   }
 
-  document.getElementById("gk1").innerHTML = html;
-  document.getElementById("gk2").innerHTML = html;
+  gk1.innerHTML=html;
+  gk2.innerHTML=html;
 }
 
-/* OPTIMIZER ENGINE */
+/* ENGINE */
 
 function generatePlan(){
 
-  playersData = [];
+  playersData=[];
 
   for(let i=0;i<Number(val("count"));i++){
 
     if(!chk("avail"+i)) continue;
 
     playersData.push({
-      name: val("p"+i),
+      name:val("p"+i),
       minutes:0,
       positions:{
-        def: chk("def"+i),
-        midc: chk("midc"+i),
-        midw: chk("midw"+i),
-        att: chk("att"+i)
+        def:chk("def"+i),
+        midc:chk("midc"+i),
+        midw:chk("midw"+i),
+        att:chk("att"+i)
       }
     });
   }
 
-  const matchLength =
+  const matchLength=
     Number(val("matchLength"));
 
-  const half =
-    matchLength / 2;
+  const half=
+    matchLength/2;
 
-  const gk1 =
+  const gk1p=
     playersData.find(
       p=>p.name===val("gk1")
     );
 
-  const gk2 =
+  const gk2p=
     playersData.find(
       p=>p.name===val("gk2")
     );
 
-  // remove keepers from rotation pool
-  const outfieldPool =
+  const outfieldPool=
     playersData.filter(
-      p=>p!==gk1 && p!==gk2
+      p=>p!==gk1p && p!==gk2p
     );
 
-  // dynamic sub blocks
-  const targetMinutes =
-    (matchLength * 5) /
+  // target minutes
+  const totalOutfieldMinutes=
+    matchLength * 5;
+
+  const ideal=
+    totalOutfieldMinutes /
     outfieldPool.length;
 
-  // build fair windows
-  let windows = [];
+  // variable windows
+  const windows=[7,7,8,7,7,8,8];
 
-  let remaining = matchLength;
+  let total=windows.reduce((a,b)=>a+b,0);
 
-  while(remaining > 0){
+  while(total<matchLength){
 
-    let next = Math.min(
-      8,
-      remaining
-    );
-
-    if(remaining-next < 6 && remaining-next !==0){
-      next = remaining;
-    }
-
-    windows.push(next);
-
-    remaining -= next;
+    windows.push(6);
+    total+=6;
   }
 
-  blocks = [];
+  if(total>matchLength){
 
-  let currentTime = 0;
+    windows[windows.length-1]-=
+      total-matchLength;
+  }
 
-  windows.forEach((windowSize,index)=>{
+  blocks=[];
 
-    currentTime += windowSize;
+  let current=0;
 
-    const lineup = [];
-    const used = new Set();
+  windows.forEach(windowSize=>{
 
-    // active GK
-    const activeGK =
-      currentTime <= half
-      ? gk1
-      : gk2;
+    current+=windowSize;
 
-    const supportGK =
-      currentTime <= half
-      ? gk2
-      : gk1;
+    const lineup=[];
+    const used=new Set();
 
-    // both keepers ALWAYS play
+    const activeGK=
+      current<=half
+      ? gk1p
+      : gk2p;
+
+    const supportGK=
+      current<=half
+      ? gk2p
+      : gk1p;
+
     lineup.push(activeGK);
     lineup.push(supportGK);
 
@@ -473,46 +472,57 @@ function generatePlan(){
 
     function choose(role){
 
-      let eligible =
+      let eligible=
         outfieldPool.filter(p=>{
 
           if(used.has(p.name))
             return false;
 
-          if(role==="def")
-            return p.positions.def;
-
-          if(role==="midc")
-            return p.positions.midc;
-
-          if(role==="midw")
-            return p.positions.midw;
-
-          if(role==="att")
-            return p.positions.att;
-
-          return true;
+          return p.positions[role];
         });
 
-      // fallback
+      // STRICT fallback order
+      if(!eligible.length && role==="midc"){
+
+        eligible=
+          outfieldPool.filter(p=>
+            !used.has(p.name) &&
+            p.positions.midw
+          );
+      }
+
+      if(!eligible.length && role==="midw"){
+
+        eligible=
+          outfieldPool.filter(p=>
+            !used.has(p.name) &&
+            p.positions.midc
+          );
+      }
+
       if(!eligible.length){
 
-        eligible =
+        eligible=
           outfieldPool.filter(
             p=>!used.has(p.name)
           );
       }
 
-      // LOWEST MINUTES FIRST
       eligible.sort((a,b)=>{
 
-        if(a.minutes===b.minutes)
+        const aGap=
+          ideal-a.minutes;
+
+        const bGap=
+          ideal-b.minutes;
+
+        if(aGap===bGap)
           return Math.random()-0.5;
 
-        return a.minutes-b.minutes;
+        return bGap-aGap;
       });
 
-      const chosen = eligible[0];
+      const chosen=eligible[0];
 
       used.add(chosen.name);
 
@@ -529,13 +539,14 @@ function generatePlan(){
     lineup.push(choose("att"));
 
     lineup.forEach(p=>{
-      p.minutes += windowSize;
+      p.minutes+=windowSize;
     });
 
     blocks.push({
-      time:currentTime,
+      time:current,
       lineup
     });
+
   });
 
   buildPlan();
@@ -545,7 +556,7 @@ function generatePlan(){
     drawPitch(blocks[0].lineup);
   }
 
-  currentIndex = 0;
+  currentIndex=0;
 
   updateNextSub();
 }
@@ -554,13 +565,13 @@ function generatePlan(){
 
 function buildPlan(){
 
-  let html = "";
+  let html="";
 
   for(let i=0;i<blocks.length;i++){
 
-    const block = blocks[i];
+    const block=blocks[i];
 
-    html += `
+    html+=`
     <div class="planBlock">
 
       <strong>${block.time}m</strong><br>
@@ -573,20 +584,20 @@ function buildPlan(){
 
     if(i>0){
 
-      const prev =
+      const prev=
         blocks[i-1];
 
-      const off =
+      const off=
         prev.lineup.filter(
           p=>!block.lineup.includes(p)
         );
 
-      const on =
+      const on=
         block.lineup.filter(
           p=>!prev.lineup.includes(p)
         );
 
-      html += `
+      html+=`
       <div class="small">
 
       OFF:
@@ -601,52 +612,45 @@ function buildPlan(){
       `;
     }
 
-    html += `
+    html+=`
     </div>
     `;
   }
 
-  document
-    .getElementById("planTable")
-    .innerHTML = html;
+  planTable.innerHTML=html;
 }
 
 /* MINUTES */
 
 function buildMinutes(){
 
-  let html = "";
+  let html="";
 
   playersData
     .sort((a,b)=>b.minutes-a.minutes)
     .forEach(p=>{
 
-      html += `
+      html+=`
       <div>
         ${p.name}: ${p.minutes} mins
       </div>
       `;
     });
 
-  document
-    .getElementById("minutesTable")
-    .innerHTML = html;
+  minutesTable.innerHTML=html;
 }
 
 /* PITCH */
 
 function drawPitch(lineup){
 
-  const pitch =
-    document.getElementById("pitch");
+  pitch.innerHTML="";
 
-  pitch.innerHTML = "";
-
-  const coords = [
+  const coords=[
     [50,90],
     [20,70],
     [80,70],
-    [50,60],
+    [50,58],
     [20,35],
     [80,35],
     [50,18]
@@ -654,17 +658,17 @@ function drawPitch(lineup){
 
   lineup.forEach((p,i)=>{
 
-    const el =
+    const el=
       document.createElement("div");
 
-    el.className = "token";
-    el.innerText = p.name;
+    el.className="token";
+    el.innerText=p.name;
 
-    el.style.left =
-      coords[i][0] + "%";
+    el.style.left=
+      coords[i][0]+"%";
 
-    el.style.top =
-      coords[i][1] + "%";
+    el.style.top=
+      coords[i][1]+"%";
 
     pitch.appendChild(el);
   });
@@ -677,69 +681,63 @@ function updateNextSub(){
   if(!blocks[currentIndex+1])
     return;
 
-  const current =
+  const current=
     blocks[currentIndex];
 
-  const next =
+  const next=
     blocks[currentIndex+1];
 
-  const off =
+  const off=
     current.lineup.filter(
       p=>!next.lineup.includes(p)
     );
 
-  const on =
+  const on=
     next.lineup.filter(
       p=>!current.lineup.includes(p)
     );
 
-  document
-    .getElementById("nextSub")
-    .innerHTML =
-    `
-    OFF:
-    ${off.map(p=>p.name).join(", ")}
+  nextSub.innerHTML=
+  `
+  OFF:
+  ${off.map(p=>p.name).join(", ")}
 
-    <br>
+  <br>
 
-    ON:
-    ${on.map(p=>p.name).join(", ")}
-    `;
+  ON:
+  ${on.map(p=>p.name).join(", ")}
+  `;
 }
 
 function startMatch(){
 
   if(timer) return;
 
-  timer = setInterval(()=>{
+  timer=setInterval(()=>{
 
     seconds++;
 
-    const mins =
+    const mins=
       Math.floor(seconds/60)
       .toString()
       .padStart(2,"0");
 
-    const secs =
+    const secs=
       (seconds%60)
       .toString()
       .padStart(2,"0");
 
-    document
-      .getElementById("clock")
-      .innerText =
+    clock.innerText=
       `${mins}:${secs}`;
 
-    const next =
+    const next=
       blocks.find(
-        b=>b.time > seconds/60
+        b=>b.time>seconds/60
       );
 
     if(next){
 
-      document
-        .getElementById("nextChange")
-        .innerText =
+      nextChange.innerText=
         `Next change: ${next.time} mins`;
     }
 
@@ -750,25 +748,23 @@ function pauseMatch(){
 
   clearInterval(timer);
 
-  timer = null;
+  timer=null;
 }
 
 function resetMatch(){
 
   pauseMatch();
 
-  seconds = 0;
+  seconds=0;
 
-  document
-    .getElementById("clock")
-    .innerText = "00:00";
+  clock.innerText="00:00";
 }
 
 function nextBlock(){
 
   currentIndex++;
 
-  if(currentIndex >= blocks.length)
+  if(currentIndex>=blocks.length)
     return;
 
   drawPitch(
