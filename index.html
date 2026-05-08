@@ -1,991 +1,1152 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Coach Pro Elite</title>
-
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
+/* ─── TOKENS ─────────────────────────────────────────── */
+:root{
+  --pitch:#2d6a2d;
+  --pitch-dark:#1e4d1e;
+  --grass-line:rgba(255,255,255,.12);
+  --black:#0d0f12;
+  --surface:#161a1f;
+  --card:#1e2329;
+  --card2:#252b33;
+  --border:rgba(255,255,255,.08);
+  --border2:rgba(255,255,255,.14);
+  --amber:#f5a623;
+  --amber-dim:#c47e10;
+  --red:#e84040;
+  --green:#3ecf6c;
+  --text:#e8ecf0;
+  --muted:#7a8694;
+  --radius:14px;
+  --tab-h:60px;
+}
+
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+
 body{
-  margin:0;
-  font-family:-apple-system,BlinkMacSystemFont,sans-serif;
-  background:#f3f4f6;
-  color:#111827;
+font-family:‘Barlow’,sans-serif;
+background:var(–black);
+color:var(–text);
+min-height:100dvh;
+overflow-x:hidden;
 }
 
+/* ─── HEADER ─────────────────────────────────────────── */
 header{
-  background:#111827;
-  color:white;
-  text-align:center;
-  padding:14px;
-  font-size:20px;
-  font-weight:700;
+position:sticky;top:0;z-index:100;
+background:var(–black);
+border-bottom:1px solid var(–border);
+display:flex;align-items:center;gap:10px;
+padding:12px 16px;
+}
+header svg{flex-shrink:0;}
+.hdr-title{
+font-family:‘Barlow Condensed’,sans-serif;
+font-weight:800;font-size:22px;letter-spacing:.5px;
+color:var(–amber);line-height:1;
+}
+.hdr-sub{font-size:11px;color:var(–muted);text-transform:uppercase;letter-spacing:1px;}
+.hdr-badge{
+margin-left:auto;
+background:var(–amber);color:var(–black);
+font-family:‘Barlow Condensed’,sans-serif;
+font-weight:800;font-size:11px;letter-spacing:1px;
+padding:3px 8px;border-radius:4px;
 }
 
-.screen{
-  display:none;
-  padding:12px 12px 90px;
-}
+/* ─── SCREENS ────────────────────────────────────────── */
+.screen{display:none;padding:14px 14px calc(var(–tab-h) + 20px);}
+.screen.active{display:block;animation:fadeUp .22s ease both;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
-.active{
-  display:block;
-}
-
+/* ─── CARDS ──────────────────────────────────────────── */
 .card{
-  background:white;
-  border-radius:14px;
-  padding:14px;
-  margin-bottom:14px;
-  box-shadow:0 2px 6px rgba(0,0,0,.08);
+background:var(–card);
+border:1px solid var(–border);
+border-radius:var(–radius);
+padding:16px;margin-bottom:14px;
+}
+.card-title{
+font-family:‘Barlow Condensed’,sans-serif;
+font-weight:700;font-size:18px;letter-spacing:.3px;
+color:var(–amber);margin-bottom:14px;
+display:flex;align-items:center;gap:8px;
+}
+.card-title span{font-size:13px;color:var(–muted);font-weight:400;margin-left:auto;}
+
+/* ─── FORM ELEMENTS ──────────────────────────────────── */
+label.field-label{
+display:block;font-size:12px;font-weight:600;
+color:var(–muted);text-transform:uppercase;letter-spacing:.8px;
+margin-bottom:5px;
+}
+input[type=“number”],input[type=“text”],select{
+width:100%;background:var(–card2);
+border:1px solid var(–border2);
+color:var(–text);border-radius:9px;
+padding:10px 12px;font-size:15px;
+font-family:‘Barlow’,sans-serif;
+outline:none;transition:border .15s;
+margin-bottom:14px;
+}
+input:focus,select:focus{border-color:var(–amber);}
+select option{background:var(–card2);}
+
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+
+/* ─── CHECKBOX TOGGLE ────────────────────────────────── */
+.toggle-row{
+display:flex;align-items:center;gap:10px;
+margin-bottom:14px;
+cursor:pointer;
+}
+.toggle-row input[type=“checkbox”]{display:none;}
+.toggle-pill{
+width:42px;height:24px;border-radius:12px;
+background:var(–card2);border:1px solid var(–border2);
+position:relative;transition:background .2s;flex-shrink:0;
+}
+.toggle-pill::after{
+content:’’;position:absolute;top:3px;left:3px;
+width:16px;height:16px;border-radius:50%;
+background:var(–muted);transition:transform .2s,background .2s;
+}
+.toggle-row input:checked+.toggle-pill{background:var(–amber);border-color:var(–amber);}
+.toggle-row input:checked+.toggle-pill::after{transform:translateX(18px);background:var(–black);}
+.toggle-label{font-size:14px;color:var(–text);}
+
+/* ─── BUTTONS ────────────────────────────────────────── */
+.btn{
+display:flex;align-items:center;justify-content:center;gap:6px;
+width:100%;padding:12px;border-radius:10px;
+border:none;cursor:pointer;font-family:‘Barlow Condensed’,sans-serif;
+font-weight:700;font-size:16px;letter-spacing:.5px;
+transition:opacity .15s,transform .1s;
+margin-bottom:10px;
+}
+.btn:active{transform:scale(.97);opacity:.85;}
+.btn-primary{background:var(–amber);color:var(–black);}
+.btn-secondary{background:var(–card2);color:var(–text);border:1px solid var(–border2);}
+.btn-danger{background:var(–red);color:#fff;}
+.btn-green{background:var(–green);color:var(–black);}
+.btn-sm{font-size:13px;padding:8px 12px;width:auto;margin-bottom:0;}
+.btn-row{display:flex;gap:8px;margin-bottom:10px;}
+.btn-row .btn{margin-bottom:0;}
+
+/* ─── PLAYER ROWS ────────────────────────────────────── */
+.player-row{
+background:var(–card2);border-radius:10px;
+border:1px solid var(–border);
+padding:12px;margin-bottom:8px;
+transition:border-color .2s;
+}
+.player-row.unavailable{opacity:.45;}
+.player-name-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.player-name-row input{margin-bottom:0;flex:1;}
+.player-avail-toggle{flex-shrink:0;}
+.role-chips{display:flex;gap:6px;flex-wrap:wrap;}
+.role-chip input{display:none;}
+.role-chip label{
+display:block;padding:4px 10px;border-radius:6px;
+font-family:‘Barlow Condensed’,sans-serif;
+font-weight:700;font-size:13px;letter-spacing:.5px;
+border:1px solid var(–border2);color:var(–muted);
+cursor:pointer;transition:all .15s;
+background:var(–card);
+}
+.role-chip input:checked+label{
+background:var(–amber);color:var(–black);
+border-color:var(–amber);
 }
 
-input,select,button{
-  width:100%;
-  box-sizing:border-box;
-  padding:10px;
-  margin-top:6px;
-  margin-bottom:10px;
-  border-radius:10px;
-  border:1px solid #d1d5db;
-  font-size:15px;
+/* ─── ERROR / ALERT ──────────────────────────────────── */
+.alert{
+border-radius:9px;padding:10px 14px;
+font-size:13px;margin-bottom:12px;
+display:none;
+}
+.alert.error{background:rgba(232,64,64,.15);border:1px solid rgba(232,64,64,.4);color:#ff8080;display:block;}
+.alert.success{background:rgba(62,207,108,.12);border:1px solid rgba(62,207,108,.3);color:var(–green);display:block;}
+
+/* ─── PLAN TABLE ─────────────────────────────────────── */
+.plan-block{
+border-bottom:1px solid var(–border);
+padding:12px 0;
+}
+.plan-block:last-child{border-bottom:none;}
+.plan-time{
+font-family:‘Barlow Condensed’,sans-serif;
+font-weight:700;font-size:16px;color:var(–amber);
+margin-bottom:4px;
+}
+.plan-names{font-size:14px;color:var(–text);line-height:1.6;}
+.plan-subs{font-size:12px;margin-top:5px;display:flex;gap:12px;flex-wrap:wrap;}
+.sub-off{color:#ff8080;}
+.sub-on{color:var(–green);}
+
+/* ─── MINUTES BAR ────────────────────────────────────── */
+.mins-row{
+display:flex;align-items:center;gap:10px;
+padding:8px 0;border-bottom:1px solid var(–border);
+}
+.mins-row:last-child{border-bottom:none;}
+.mins-name{font-size:14px;font-weight:600;width:90px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.mins-bar-wrap{flex:1;background:var(–card2);border-radius:4px;height:8px;overflow:hidden;}
+.mins-bar{height:100%;border-radius:4px;background:var(–amber);transition:width .5s ease;}
+.mins-val{font-size:12px;color:var(–muted);width:32px;text-align:right;flex-shrink:0;}
+
+/* ─── PITCH ──────────────────────────────────────────── */
+.pitch-wrap{
+position:relative;width:100%;
+padding-bottom:130%;/* portrait ratio */
+border-radius:12px;overflow:hidden;
+background:var(–pitch-dark);
+}
+.pitch-svg{
+position:absolute;inset:0;width:100%;height:100%;
+}
+.pitch-token{
+position:absolute;transform:translate(-50%,-50%);
+background:var(–black);border:2px solid var(–amber);
+border-radius:20px;padding:4px 8px;
+font-family:‘Barlow Condensed’,sans-serif;
+font-weight:700;font-size:12px;color:var(–amber);
+white-space:nowrap;max-width:80px;
+overflow:hidden;text-overflow:ellipsis;
+text-align:center;
+transition:all .4s cubic-bezier(.34,1.56,.64,1);
+box-shadow:0 2px 8px rgba(0,0,0,.5);
+z-index:2;
+}
+.pitch-token.gk{
+background:var(–amber);color:var(–black);
+border-color:var(–amber);
+}
+.pitch-token.new-player{
+border-color:var(–green);color:var(–green);
+animation:popIn .4s cubic-bezier(.34,1.56,.64,1) both;
+}
+@keyframes popIn{from{transform:translate(-50%,-50%) scale(.5);opacity:0}to{transform:translate(-50%,-50%) scale(1);opacity:1}}
+
+/* ─── MATCH SCREEN ───────────────────────────────────── */
+.clock-display{
+font-family:‘Barlow Condensed’,sans-serif;
+font-weight:800;font-size:72px;letter-spacing:2px;
+text-align:center;color:var(–amber);
+line-height:1;padding:20px 0 10px;
+}
+.clock-half{
+text-align:center;font-size:12px;letter-spacing:1.5px;
+text-transform:uppercase;color:var(–muted);
+margin-bottom:16px;
+}
+.next-change-bar{
+background:var(–card);border:1px solid var(–border2);
+border-radius:10px;padding:12px 14px;margin-bottom:10px;
+}
+.next-change-bar .label{
+font-size:11px;text-transform:uppercase;letter-spacing:1px;
+color:var(–muted);margin-bottom:6px;
+}
+.next-change-bar .value{font-size:15px;font-weight:600;}
+.sub-card{
+background:var(–card2);border-radius:10px;
+border:1px solid var(–border);
+padding:12px;margin-bottom:8px;
+}
+.sub-card-time{
+font-family:‘Barlow Condensed’,sans-serif;
+font-weight:700;color:var(–amber);font-size:14px;margin-bottom:4px;
+}
+.progress-wrap{
+height:4px;background:var(–card2);border-radius:2px;
+margin-bottom:16px;overflow:hidden;
+}
+.progress-fill{
+height:100%;background:var(–amber);border-radius:2px;
+transition:width 1s linear;
 }
 
-button{
-  background:#111827;
-  color:white;
-  border:none;
-  font-weight:700;
-}
-
-.player{
-  border-bottom:1px solid #e5e7eb;
-  padding:10px 0;
-}
-
-.roles{
-  display:flex;
-  gap:12px;
-  flex-wrap:wrap;
-  margin-top:8px;
-}
-
-.roles label{
-  font-size:12px;
-}
-
-.pitch{
-  position:relative;
-  height:420px;
-  border-radius:12px;
-  overflow:hidden;
-  background:linear-gradient(#4CAF50,#2E7D32);
-}
-
-.token{
-  position:absolute;
-  transform:translate(-50%,-50%);
-  background:white;
-  border-radius:10px;
-  padding:6px 8px;
-  font-size:12px;
-  font-weight:700;
-  white-space:nowrap;
-}
-
-.planBlock{
-  border-bottom:1px solid #eee;
-  padding:10px 0;
-}
-
-.small{
-  font-size:13px;
-  color:#666;
-}
-
+/* ─── TABBAR ─────────────────────────────────────────── */
 .tabbar{
-  position:fixed;
-  bottom:0;
-  width:100%;
-  display:flex;
-  background:white;
-  border-top:1px solid #ddd;
+position:fixed;bottom:0;left:0;right:0;z-index:200;
+height:var(–tab-h);
+background:var(–surface);
+border-top:1px solid var(–border);
+display:flex;
+}
+.tabbar-btn{
+flex:1;display:flex;flex-direction:column;
+align-items:center;justify-content:center;gap:3px;
+background:none;border:none;cursor:pointer;
+font-family:‘Barlow Condensed’,sans-serif;
+font-weight:600;font-size:11px;letter-spacing:.5px;
+text-transform:uppercase;color:var(–muted);
+transition:color .15s;
+padding-bottom:env(safe-area-inset-bottom,0);
+}
+.tabbar-btn svg{transition:color .15s;}
+.tabbar-btn.active{color:var(–amber);}
+.tabbar-btn.active svg{color:var(–amber);}
+
+/* ─── SECTION HEADING ────────────────────────────────── */
+.section-heading{
+font-family:‘Barlow Condensed’,sans-serif;
+font-weight:700;font-size:13px;letter-spacing:1px;
+text-transform:uppercase;color:var(–muted);
+margin:0 0 8px;
 }
 
-.tabbar button{
-  flex:1;
-  margin:0;
-  border-radius:0;
-}
-
-.highlight{
-  background:#fef3c7;
-  padding:12px;
-  border-radius:10px;
-  margin-bottom:10px;
-  text-align:center;
-}
-
-.timer{
-  font-size:42px;
-  text-align:center;
-  font-weight:700;
-  margin:10px 0 20px;
-}
-
-.error{
-  background:#fee2e2;
-  color:#991b1b;
-  padding:10px;
-  border-radius:10px;
-  margin-bottom:10px;
+/* ─── PLAYER COUNT BADGE ─────────────────────────────── */
+.squad-badge{
+display:inline-flex;align-items:center;justify-content:center;
+background:var(–amber);color:var(–black);
+font-family:‘Barlow Condensed’,sans-serif;
+font-weight:800;font-size:13px;
+width:22px;height:22px;border-radius:50%;
+margin-left:6px;
 }
 </style>
-</head>
 
+</head>
 <body>
 
-<header>⚽ Coach Pro Elite</header>
+<header>
+  <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+    <circle cx="14" cy="14" r="13" stroke="#f5a623" stroke-width="2"/>
+    <path d="M14 6 l2.2 6.8H23l-5.6 4 2.2 6.8L14 19.5l-5.6 4 2.2-6.8L5 10.8h6.8z" fill="#f5a623"/>
+  </svg>
+  <div>
+    <div class="hdr-title">Coach Pro Elite</div>
+    <div class="hdr-sub">Match Manager</div>
+  </div>
+  <div class="hdr-badge">v2</div>
+</header>
 
-<div id="setup" class="screen active">
+<!-- ═══════════════════════════════════════════════════ SETUP -->
 
-<div class="card">
+<div id="screen-setup" class="screen active">
 
-<div id="errorBox"></div>
+  <div class="card">
+    <div class="card-title">⚙ Match Settings</div>
 
-<label>Match Length (mins)</label>
-<input id="matchLength" type="number" value="52">
+```
+<div class="row2">
+  <div>
+    <label class="field-label">Match Length (mins)</label>
+    <input id="matchLength" type="number" value="52" min="10" max="120">
+  </div>
+  <div>
+    <label class="field-label">Squad Size</label>
+    <input id="squadCount" type="number" value="11" min="7" max="20">
+  </div>
+</div>
 
-<label>Squad Size</label>
-<input id="count" type="number" value="11">
-
-<label>
-<input type="checkbox" id="gkMode" checked>
-Off-goal keeper plays outfield
+<label class="toggle-row" for="gkMode">
+  <input type="checkbox" id="gkMode" checked>
+  <span class="toggle-pill"></span>
+  <span class="toggle-label">GKs play full half in goal + full half outfield</span>
 </label>
 
-<button onclick="renderPlayers()">
-Build Squad Inputs
+<div id="alertBox" class="alert"></div>
+
+<button class="btn btn-secondary" onclick="buildPlayerInputs()">
+  Build Squad ↓
 </button>
+```
 
-<div id="playersContainer"></div>
+  </div>
 
-<button onclick="saveSquad()">
-Save Squad
+  <div id="playersSection" style="display:none">
+    <div class="card">
+      <div class="card-title">
+        🧑‍🤝‍🧑 Squad
+        <span id="squadCountBadge"></span>
+      </div>
+      <div id="playersContainer"></div>
+      <button class="btn btn-secondary" onclick="saveSquad()">💾 Save Squad</button>
+    </div>
+
+```
+<div class="card">
+  <div class="card-title">🧤 Goalkeepers</div>
+  <label class="field-label">1st Half GK</label>
+  <select id="gk1"></select>
+  <label class="field-label">2nd Half GK</label>
+  <select id="gk2"></select>
+</div>
+
+<button class="btn btn-primary" onclick="onGeneratePlan()">
+  ⚡ Generate Match Plan
 </button>
+```
 
-<h3>Goalkeepers</h3>
-
-<label>1st Half GK</label>
-<select id="gk1"></select>
-
-<label>2nd Half GK</label>
-<select id="gk2"></select>
-
-<button onclick="generatePlan();showTab('plan')">
-Generate Match Plan
-</button>
+  </div>
 
 </div>
 
+<!-- ═══════════════════════════════════════════════════ PLAN -->
+
+<div id="screen-plan" class="screen">
+
+  <div class="card">
+    <div class="card-title">📋 Rotation Plan</div>
+    <div id="planTable"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">⏱ Playing Time</div>
+    <div id="minutesTable"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🏟 Kickoff Lineup</div>
+    <div class="pitch-wrap" id="pitchWrap">
+      <svg class="pitch-svg" viewBox="0 0 200 260" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- grass strips -->
+        <rect width="200" height="260" fill="#2d6a2d"/>
+        <rect y="0" width="200" height="26" fill="#326e32" opacity=".6"/>
+        <rect y="52" width="200" height="26" fill="#326e32" opacity=".6"/>
+        <rect y="104" width="200" height="26" fill="#326e32" opacity=".6"/>
+        <rect y="156" width="200" height="26" fill="#326e32" opacity=".6"/>
+        <rect y="208" width="200" height="26" fill="#326e32" opacity=".6"/>
+        <!-- boundary -->
+        <rect x="4" y="4" width="192" height="252" rx="2" stroke="white" stroke-opacity=".25" stroke-width="1.5" fill="none"/>
+        <!-- halfway -->
+        <line x1="4" y1="130" x2="196" y2="130" stroke="white" stroke-opacity=".25" stroke-width="1"/>
+        <!-- centre circle -->
+        <circle cx="100" cy="130" r="28" stroke="white" stroke-opacity=".25" stroke-width="1" fill="none"/>
+        <circle cx="100" cy="130" r="2" fill="white" fill-opacity=".4"/>
+        <!-- penalty areas -->
+        <rect x="50" y="4" width="100" height="44" stroke="white" stroke-opacity=".2" stroke-width="1" fill="none"/>
+        <rect x="50" y="212" width="100" height="44" stroke="white" stroke-opacity=".2" stroke-width="1" fill="none"/>
+        <!-- goal areas -->
+        <rect x="74" y="4" width="52" height="20" stroke="white" stroke-opacity=".15" stroke-width="1" fill="none"/>
+        <rect x="74" y="236" width="52" height="20" stroke="white" stroke-opacity=".15" stroke-width="1" fill="none"/>
+        <!-- penalty spots -->
+        <circle cx="100" cy="38" r="1.5" fill="white" fill-opacity=".4"/>
+        <circle cx="100" cy="222" r="1.5" fill="white" fill-opacity=".4"/>
+      </svg>
+    </div>
+  </div>
+
+  <button class="btn btn-green" onclick="showTab('screen-match')">
+    ▶ Go to Match Timer
+  </button>
+
 </div>
 
-<div id="plan" class="screen">
+<!-- ═══════════════════════════════════════════════════ MATCH -->
 
-<div class="card">
-<h3>Rotation Plan</h3>
-<div id="planTable"></div>
-</div>
+<div id="screen-match" class="screen">
 
-<div class="card">
-<h3>Minutes</h3>
-<div id="minutesTable"></div>
-</div>
+  <div class="clock-display" id="clock">00:00</div>
+  <div class="clock-half" id="halfLabel">PRE-MATCH</div>
+  <div class="progress-wrap"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
 
-<div class="card">
-<h3>Tactical Board</h3>
-<div id="pitch" class="pitch"></div>
-</div>
+  <div class="btn-row">
+    <button class="btn btn-green" id="btnStart" onclick="startMatch()" style="flex:2">▶ Start</button>
+    <button class="btn btn-secondary" onclick="pauseMatch()">⏸ Pause</button>
+    <button class="btn btn-danger btn-sm" onclick="resetMatch()" style="flex:1;margin-bottom:0">↺ Reset</button>
+  </div>
 
-</div>
+  <div class="next-change-bar" id="nextChangebar">
+    <div class="label">Next change at</div>
+    <div class="value" id="nextChangeValue">— generate a plan first —</div>
+  </div>
 
-<div id="matchScreen" class="screen">
+  <div class="card" id="subListCard">
+    <div class="card-title">🔄 Upcoming Substitutions</div>
+    <div id="subList"></div>
+  </div>
 
-<div class="timer" id="clock">00:00</div>
+<button class="btn btn-secondary" onclick="forceNextBlock()">⏭ Force Next Change</button>
 
-<div class="highlight" id="nextChange">
-Next change:
-</div>
-
-<div class="highlight" id="nextSub">
-Upcoming subs:
-</div>
-
-<button onclick="startMatch()">Start Match</button>
-<button onclick="pauseMatch()">Pause</button>
-<button onclick="resetMatch()">Reset</button>
-<button onclick="nextBlock()">Next Change</button>
+  <div class="card">
+    <div class="card-title">🏟 Live Lineup</div>
+    <div class="pitch-wrap" id="liveWrap"></div>
+  </div>
 
 </div>
+
+<!-- ═══════════════════════════════════════════════════ TABBAR -->
 
 <div class="tabbar">
-<button onclick="showTab('setup')">Setup</button>
-<button onclick="showTab('plan')">Plan</button>
-<button onclick="showTab('matchScreen')">Match</button>
+  <button class="tabbar-btn active" id="tab-setup" onclick="showTab('screen-setup')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+    </svg>
+    Setup
+  </button>
+  <button class="tabbar-btn" id="tab-plan" onclick="showTab('screen-plan')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="3"/>
+    </svg>
+    Plan
+  </button>
+  <button class="tabbar-btn" id="tab-match" onclick="showTab('screen-match')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/>
+    </svg>
+    Match
+  </button>
 </div>
 
 <script>
+/* ════════════════════════════════════════════════════════
+   STATE
+═════════════════════════════════════════════════════════ */
+let playersData    = [];
+let blocks         = [];
+let currentBlockIdx = 0;
+let timerInterval  = null;
+let elapsedSeconds = 0;
+let matchLengthMins = 52;
+let planGenerated  = false;
+let planSummary    = null;
 
-let playersData=[];
-let blocks=[];
-let currentIndex=0;
-let timer=null;
-let seconds=0;
+/* ════════════════════════════════════════════════════════
+   UTILITIES
+═════════════════════════════════════════════════════════ */
+const $ = id => document.getElementById(id);
+function getVal(id){ return ($( id )?.value ?? '').trim(); }
+function getNum(id){ return Number(getVal(id)) || 0; }
+function getChk(id){ return !!$( id )?.checked; }
 
-function val(id){
-  return document.getElementById(id)?.value || "";
+function showAlert(msg, type = 'error'){
+  const el = $('alertBox');
+  el.textContent = msg;
+  el.className = `alert ${type}`;
+  setTimeout(() => { el.className = 'alert'; }, 5000);
 }
 
-function chk(id){
-  return document.getElementById(id)?.checked || false;
-}
-
-function showError(msg){
-  errorBox.innerHTML=`<div class="error">${msg}</div>`;
-}
-
-function clearError(){
-  errorBox.innerHTML="";
-}
-
-function showTab(id){
-
-  document
-    .querySelectorAll(".screen")
-    .forEach(s=>s.classList.remove("active"));
-
-  document
-    .getElementById(id)
-    .classList.add("active");
-}
-
-function renderPlayers(){
-
-  const saved=
-    JSON.parse(
-      localStorage.getItem("coachSquad") || "[]"
-    );
-
-  let html="";
-
-  for(let i=0;i<Number(val("count"));i++){
-
-    const p=saved[i] || {};
-
-    html+=`
-    <div class="player">
-
-      <input
-        id="p${i}"
-        value="${p.name || ""}"
-        placeholder="Player Name"
-        oninput="updateGKSelectors()"
-      >
-
-      <label>
-        <input
-          type="checkbox"
-          id="avail${i}"
-          ${p.available!==false?"checked":""}
-        >
-        Available
-      </label>
-
-      <div class="roles">
-
-        <label>
-          <input type="checkbox"
-            id="def${i}"
-            ${p.def?"checked":""}>
-          DEF
-        </label>
-
-        <label>
-          <input type="checkbox"
-            id="midc${i}"
-            ${p.midc?"checked":""}>
-          MID-C
-        </label>
-
-        <label>
-          <input type="checkbox"
-            id="midw${i}"
-            ${p.midw?"checked":""}>
-          MID-W
-        </label>
-
-        <label>
-          <input type="checkbox"
-            id="att${i}"
-            ${p.att?"checked":""}>
-          ATT
-        </label>
-
-      </div>
-
-    </div>
-    `;
-  }
-
-  playersContainer.innerHTML=html;
-
-  updateGKSelectors();
-}
-
-function saveSquad(){
-
-  const squad=[];
-
-  for(let i=0;i<Number(val("count"));i++){
-
-    squad.push({
-      name:val("p"+i),
-      available:chk("avail"+i),
-      def:chk("def"+i),
-      midc:chk("midc"+i),
-      midw:chk("midw"+i),
-      att:chk("att"+i)
-    });
-  }
-
-  localStorage.setItem(
-    "coachSquad",
-    JSON.stringify(squad)
-  );
-}
-
-function updateGKSelectors(){
-
-  let html="";
-
-  for(let i=0;i<Number(val("count"));i++){
-
-    if(!chk("avail"+i)) continue;
-
-    const name=val("p"+i);
-
-    if(!name) continue;
-
-    html+=`<option>${name}</option>`;
-  }
-
-  gk1.innerHTML=html;
-  gk2.innerHTML=html;
-}
-
+// Proper shuffle — no sort-based fake shuffle
 function shuffle(arr){
-
-  const a=[...arr];
-
-  for(let i=a.length-1;i>0;i--){
-
-    const j=
-      Math.floor(
-        Math.random()*(i+1)
-      );
-
-    [a[i],a[j]]=
-      [a[j],a[i]];
+  const a = [...arr];
+  for(let i = a.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
   }
-
   return a;
 }
 
+/* ════════════════════════════════════════════════════════
+   TAB NAVIGATION
+═════════════════════════════════════════════════════════ */
+function showTab(id){
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tabbar-btn').forEach(b => b.classList.remove('active'));
+  $(id).classList.add('active');
+  $('tab-' + id.replace('screen-',''))?.classList.add('active');
+}
+
+/* ════════════════════════════════════════════════════════
+   SQUAD BUILDER
+═════════════════════════════════════════════════════════ */
+function buildPlayerInputs(){
+  const count = getNum('squadCount');
+  if(count < 7 || count > 20){ showAlert('Squad size must be 7–20.'); return; }
+  const saved = JSON.parse(localStorage.getItem('cpe_squad') || '[]');
+  let html = '';
+  for(let i = 0; i < count; i++){
+    const p = saved[i] || {};
+    html += `
+    <div class="player-row" id="prow${i}">
+      <div class="player-name-row">
+        <input type="text" id="pname${i}" value="${p.name||''}" placeholder="Player ${i+1}" oninput="refreshGKSelectors()">
+        <label class="toggle-row player-avail-toggle" for="pavail${i}" style="margin-bottom:0">
+          <input type="checkbox" id="pavail${i}" ${p.available!==false?'checked':''} onchange="togglePlayerAvail(${i})">
+          <span class="toggle-pill"></span>
+        </label>
+      </div>
+      <div class="role-chips">
+        ${['DEF','MID-C','MID-W','ATT'].map((r,ri) => {
+          const k = ['def','midc','midw','att'][ri];
+          return `<div class="role-chip">
+            <input type="checkbox" id="p${i}_${k}" ${p[k]?'checked':''}>
+            <label for="p${i}_${k}">${r}</label>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }
+  $('playersContainer').innerHTML = html;
+  $('playersSection').style.display = '';
+  refreshGKSelectors();
+  updateSquadBadge();
+}
+
+function togglePlayerAvail(i){
+  $(`prow${i}`).classList.toggle('unavailable', !getChk(`pavail${i}`));
+  refreshGKSelectors();
+}
+
+function updateSquadBadge(){
+  const count = getNum('squadCount');
+  let avail = 0;
+  for(let i = 0; i < count; i++) if(getChk(`pavail${i}`)) avail++;
+  $('squadCountBadge').textContent = `${avail} available`;
+}
+
+function refreshGKSelectors(){
+  updateSquadBadge();
+  const count = getNum('squadCount');
+  let opts = '';
+  for(let i = 0; i < count; i++){
+    if(!getChk(`pavail${i}`)) continue;
+    const name = getVal(`pname${i}`);
+    if(!name) continue;
+    opts += `<option value="${name}">${name}</option>`;
+  }
+  $('gk1').innerHTML = opts;
+  $('gk2').innerHTML = opts;
+  if($('gk2').options.length > 1) $('gk2').options[1].selected = true;
+}
+
+function saveSquad(){
+  const count = getNum('squadCount');
+  const squad = [];
+  for(let i = 0; i < count; i++){
+    squad.push({ name:getVal(`pname${i}`), available:getChk(`pavail${i}`),
+      def:getChk(`p${i}_def`), midc:getChk(`p${i}_midc`),
+      midw:getChk(`p${i}_midw`), att:getChk(`p${i}_att`) });
+  }
+  localStorage.setItem('cpe_squad', JSON.stringify(squad));
+  showAlert('Squad saved!', 'success');
+}
+
+function collectPlayers(){
+  const count = getNum('squadCount');
+  const players = [];
+  for(let i = 0; i < count; i++){
+    if(!getChk(`pavail${i}`)) continue;
+    const name = getVal(`pname${i}`).trim();
+    if(!name) continue;
+    players.push({ name,
+      positions:{ def:getChk(`p${i}_def`), midc:getChk(`p${i}_midc`),
+                  midw:getChk(`p${i}_midw`), att:getChk(`p${i}_att`) },
+      outfieldMins:0, totalMins:0 });
+  }
+  return players;
+}
+
+/* ════════════════════════════════════════════════════════
+   PLAN GENERATION
+═════════════════════════════════════════════════════════ */
+function onGeneratePlan(){
+  const err = generatePlan();
+  if(!err) showTab('screen-plan');
+}
+
 function generatePlan(){
+  matchLengthMins = getNum('matchLength');
+  if(matchLengthMins < 10 || matchLengthMins > 120){
+    showAlert('Match length must be 10–120 mins.'); return 'invalid';
+  }
+  playersData = collectPlayers();
+  if(playersData.length < 7){ showAlert('Need at least 7 available players.'); return 'few'; }
 
-  clearError();
+  const gk1Name = getVal('gk1'), gk2Name = getVal('gk2');
+  if(!gk1Name || !gk2Name){ showAlert('Select both goalkeepers.'); return 'no gks'; }
+  if(gk1Name === gk2Name){ showAlert('1st and 2nd half GKs must differ.'); return 'same gk'; }
+  const gk1 = playersData.find(p => p.name === gk1Name);
+  const gk2 = playersData.find(p => p.name === gk2Name);
+  if(!gk1 || !gk2){ showAlert('Selected GKs not found.'); return 'missing gk'; }
 
-  playersData=[];
+  const half     = matchLengthMins / 2;
+  const gkFull   = getChk('gkMode'); // true = GKs play full half goal + full half outfield
 
-  const matchLength=
-    Number(val("matchLength"));
+  /* ── GK outfield minutes ─────────────────────────────
+     gkFull=true:  each GK plays exactly `half` mins outfield
+     gkFull=false: each GK plays their equal share of outfield
+                   time — same target as outfield players        */
 
-  if(matchLength<=0){
-    showError("Invalid match length");
-    return;
+  /* ── Outfield pool (never includes GKs directly) ─────
+     Pool = all non-GK players. GKs are handled separately.
+     OUTFIELD_SLOTS = 6 (always).
+     Each segment: 1 GK in goal + 6 outfield = 7 on pitch.
+     In gkFull mode: the off-GK occupies 1 of those 6 outfield
+       slots for ALL segments of their outfield half.
+     In non-gkFull mode: GKs never appear in outfield slots;
+       they compete for outfield minutes from the pool EXCEPT
+       they are injected into the plan for the outfield segments
+       that equal their target.
+  ════════════════════════════════════════════════════════ */
+  const SLOTS    = 6;   // outfield slots per lineup
+  const allNonGK = playersData.filter(p => p !== gk1 && p !== gk2);
+  if(allNonGK.length < 5){
+    showAlert('Need at least 5 non-GK players.'); return 'few outfield';
   }
 
-  for(let i=0;i<Number(val("count"));i++){
-
-    if(!chk("avail"+i)) continue;
-
-    const name=val("p"+i).trim();
-
-    if(!name) continue;
-
-    playersData.push({
-      name,
-      totalMinutes:0,
-      outfieldMinutes:0,
-      positions:{
-        def:chk("def"+i),
-        midc:chk("midc"+i),
-        midw:chk("midw"+i),
-        att:chk("att"+i)
+  /* ── Segment builder ─────────────────────────────────
+     Segments have equal duration per half (integer rounded).
+     subAt = minute when coach makes the substitution.
+     end   = minute the lineup stops playing.
+     Halftime always a boundary; minimum segsPerHalf for
+     spread ≤ 1 min among outfield pool, capped at 4.        */
+  function buildSegs(sph){
+    const segs = []; let cur = 0;
+    for(let h = 0; h < 2; h++){
+      let rem = half;
+      for(let s = 0; s < sph; s++){
+        const dur = Math.round(rem / (sph - s));
+        segs.push({ subAt:cur, dur, end:cur+dur });
+        cur += dur; rem -= dur;
       }
+    }
+    return segs;
+  }
+
+  /* ── GK MODE ─────────────────────────────────────────
+     gkFull=true:  off-GK is FORCED into every segment of
+       their outfield half (plays the full half outfield).
+       Lineup = activeGK(goal) + offGK(outfield) + 5 from pool.
+
+     gkFull=false: off-GK joins the POOL for their outfield
+       half and rotates in/out like any other player, getting
+       their fair share of outfield minutes.
+       Lineup = activeGK(goal) + 6 from pool (pool includes
+       the off-GK for segments in their outfield half).        */
+
+  // Pool used for spread simulation always = allNonGK (6 slots from pool).
+  // When gkFull, off-GK takes 1 of those 6 → effectively 5 slots for allNonGK.
+  // When !gkFull, off-GK IS in the pool → 6 slots for (allNonGK + offGK).
+  // Simulating spread: use allNonGK.length for !gkFull (GKs are already in pool),
+  //   use allNonGK.length for gkFull with 5 slots.
+
+  const poolSlotsPerSeg = gkFull ? SLOTS - 1 : SLOTS;
+
+  function simSpread(segs){
+    // Simulate with the rotating pool only (excludes forced off-GK in gkFull).
+    const pool = allNonGK;
+    const N    = pool.length;
+    const acc  = new Array(N).fill(0);
+    for(const seg of segs){
+      const order = Array.from({length:N},(_,i)=>i).sort((a,b)=>acc[a]-acc[b]);
+      order.slice(0, Math.min(poolSlotsPerSeg, N)).forEach(i => acc[i] += seg.dur);
+    }
+    return N ? Math.max(...acc) - Math.min(...acc) : 0;
+  }
+
+  let segsPerHalf = 1, bestSpread = Infinity;
+  for(let sph = 1; sph <= 4; sph++){
+    const sp = simSpread(buildSegs(sph));
+    if(sp < bestSpread){ bestSpread = sp; segsPerHalf = sph; }
+    if(sp <= 1) break;
+  }
+  const segments = buildSegs(segsPerHalf);
+
+  // Role slots filled from pool each segment:
+  //   gkFull=true:  5 roles (off-GK takes 1 slot outside roleSeq)
+  //   gkFull=false: 6 roles (all 6 filled from pool including off-GK when eligible)
+  const roleSeq = gkFull
+    ? ['def','def','midc','midw','att']
+    : ['def','def','midc','midw','midw','att'];
+
+  function pickForRole(role, usedSet, candidatePool, segDur){
+    const available = candidatePool.filter(p => !usedSet.has(p.name));
+    if(!available.length) return null;
+    // Score = outfieldMins + segDur penalty if wrong role.
+    // Prefer role-correct players while keeping time balanced.
+    return available.reduce((best, p) => {
+      const sP = p.outfieldMins + (p.positions[role] ? 0 : segDur);
+      const sB = best.outfieldMins + (best.positions[role] ? 0 : segDur);
+      return sP < sB ? p : best;
     });
   }
 
-  if(playersData.length<7){
-    showError("Need at least 7 players");
-    return;
-  }
+  /* ── Reset minutes ─────────────────────────────────── */
+  playersData.forEach(p => { p.outfieldMins = 0; p.totalMins = 0; });
 
-  const gk1Player=
-    playersData.find(
-      p=>p.name===val("gk1")
-    );
+  blocks = [];
 
-  const gk2Player=
-    playersData.find(
-      p=>p.name===val("gk2")
-    );
+  for(const seg of segments){
+    const inFirst  = seg.end <= half + 0.01;
+    const activeGK = inFirst ? gk1 : gk2;  // in goal this segment
+    const offGK    = inFirst ? gk2 : gk1;  // outfield candidate this segment
 
-  if(!gk1Player || !gk2Player){
-    showError("Select both keepers");
-    return;
-  }
+    const lineup = [];
+    const used   = new Set();
 
-  if(gk1Player===gk2Player){
-    showError("Keepers must differ");
-    return;
-  }
-
-  const fixedGKMode=
-    chk("gkMode");
-
-  blocks=[];
-
-  playersData.forEach(p=>{
-    p.totalMinutes=0;
-    p.outfieldMinutes=0;
-  });
-
-  const halfLength=
-    matchLength/2;
-
-  const rotatingPlayers=
-    fixedGKMode
-    ? playersData.filter(
-        p=>p!==gk1Player &&
-           p!==gk2Player
-      )
-    : [...playersData];
-
-  const totalOutfieldMinutes=
-    matchLength * 6;
-
-  const reservedGKMinutes=
-    fixedGKMode
-    ? matchLength
-    : 0;
-
-  const distributableMinutes=
-    totalOutfieldMinutes -
-    reservedGKMinutes;
-
-  const exactTarget=
-    distributableMinutes /
-    rotatingPlayers.length;
-
-  const desiredBlocks=
-    Math.max(
-      3,
-      Math.round(matchLength/10)
-    );
-
-  const windows=[];
-
-  let remaining=
-    matchLength;
-
-  for(let i=0;i<desiredBlocks;i++){
-
-    const remainingBlocks=
-      desiredBlocks-i;
-
-    const block=
-      Math.round(
-        remaining /
-        remainingBlocks
-      );
-
-    windows.push(block);
-
-    remaining-=block;
-  }
-
-  const cumulative=[];
-
-  let running=0;
-
-  windows.forEach(w=>{
-    running+=w;
-    cumulative.push(running);
-  });
-
-  const floorTarget=
-    Math.floor(exactTarget);
-
-  const ceilTarget=
-    Math.ceil(exactTarget);
-
-  const extraPlayers=
-    distributableMinutes -
-    (
-      floorTarget *
-      rotatingPlayers.length
-    );
-
-  rotatingPlayers.forEach((p,index)=>{
-
-    p.targetMinutes=
-      index < extraPlayers
-      ? ceilTarget
-      : floorTarget;
-  });
-
-  function need(player){
-
-    return (
-      player.targetMinutes -
-      player.outfieldMinutes
-    );
-  }
-
-  function pick(role,used){
-
-    let pool=
-      rotatingPlayers.filter(p=>{
-
-        if(used.has(p.name))
-          return false;
-
-        if(role==="any")
-          return true;
-
-        return p.positions[role];
-      });
-
-    pool=
-      shuffle(pool)
-      .sort((a,b)=>
-        need(b)-need(a)
-      );
-
-    return pool[0];
-  }
-
-  let previousLineup=[];
-
-  cumulative.forEach((time,index)=>{
-
-    const blockMinutes=
-      windows[index];
-
-    const lineup=[];
-
-    const used=
-      new Set();
-
-    const activeGK=
-      time<=halfLength
-      ? gk1Player
-      : gk2Player;
-
-    const offGoalGK=
-      time<=halfLength
-      ? gk2Player
-      : gk1Player;
-
+    // Active GK always in goal
     lineup.push(activeGK);
-
     used.add(activeGK.name);
 
-    if(fixedGKMode){
-
-      lineup.push(offGoalGK);
-
-      used.add(offGoalGK.name);
-    }
-
-    const rolePlan=[
-      "midc",
-      "def",
-      "def",
-      "midw",
-      "att",
-      "any"
-    ];
-
-    const outfieldNeeded=
-      fixedGKMode
-      ? 5
-      : 6;
-
-    for(let i=0;i<outfieldNeeded;i++){
-
-      const picked=
-        pick(
-          rolePlan[i],
-          used
-        );
-
-      if(!picked){
-
-        showError(
-          "Could not satisfy positions"
-        );
-
-        return;
+    if(gkFull){
+      // OFF-GK forced into outfield for their entire off-half
+      lineup.push(offGK);
+      used.add(offGK.name);
+      // Remaining 5 slots from allNonGK pool
+      const poolShuffled = shuffle(allNonGK);
+      for(const role of roleSeq){
+        const picked = pickForRole(role, used, poolShuffled, seg.dur);
+        if(!picked){ showAlert('Not enough players.'); blocks=[]; return 'fail'; }
+        lineup.push(picked);
+        used.add(picked.name);
       }
-
-      lineup.push(picked);
-
-      used.add(picked.name);
-    }
-
-    if(index>0){
-
-      const overlap=
-        lineup.filter(
-          p=>previousLineup.includes(p)
-        ).length;
-
-      if(overlap>=6){
-
-        const alternatives=
-          rotatingPlayers
-          .filter(
-            p=>!lineup.includes(p)
-          )
-          .sort((a,b)=>
-            need(b)-need(a)
-          );
-
-        if(alternatives.length){
-
-          lineup[lineup.length-1]=
-            alternatives[0];
-        }
+    } else {
+      // OFF-GK joins pool for their off-half — competes for outfield slots
+      // Build pool = allNonGK + offGK (shuffled together)
+      const pool = shuffle([...allNonGK, offGK]);
+      for(const role of roleSeq){
+        const picked = pickForRole(role, used, pool, seg.dur);
+        if(!picked){ showAlert('Not enough players.'); blocks=[]; return 'fail'; }
+        lineup.push(picked);
+        used.add(picked.name);
       }
     }
 
-    lineup.forEach(player=>{
+    // Accrue immediately so next segment picks correctly
+    lineup.forEach(p => { p.totalMins += seg.dur; });
+    lineup.forEach(p => { if(p !== activeGK) p.outfieldMins += seg.dur; });
 
-      player.totalMinutes+=
-        blockMinutes;
+    blocks.push({ subAt: seg.subAt, end: seg.end, dur: seg.dur,
+                  lineup: [...lineup], activeGK });
+  }
 
-      if(player!==activeGK){
+  /* ── Precompute per-block substitution pairs ─────────
+     For each block i>0, record exactly which player comes OFF
+     and which comes ON as matched pairs (OFF[j] replaced by ON[j]).
+     Strategy: pair by position in lineup where possible.         */
+  for(let i = 1; i < blocks.length; i++){
+    const prev = blocks[i-1].lineup;
+    const cur  = blocks[i].lineup;
+    const off  = prev.filter(p => !cur.includes(p));
+    const on   = cur.filter(p  => !prev.includes(p));
+    // Match pairs: zip off/on by order
+    blocks[i].subs = off.map((p,j) => ({ off: p, on: on[j] || null }));
+  }
+  blocks[0].subs = [];
 
-        player.outfieldMinutes+=
-          blockMinutes;
-      }
-    });
+  /* ── Sync display fields ─────────────────────────────  */
+  playersData.forEach(p => { p.outfieldMinutes = p.outfieldMins; p.totalMinutes = p.totalMins; });
 
-    blocks.push({
-      time,
-      lineup
-    });
+  const ofMins = playersData.map(p => p.outfieldMins).filter(m => m > 0);
+  planSummary = {
+    segsPerHalf,
+    spread:       ofMins.length ? Math.max(...ofMins) - Math.min(...ofMins) : 0,
+    perPlayer:    ofMins.length ? Math.min(...ofMins) : 0,
+    perPlayerMax: ofMins.length ? Math.max(...ofMins) : 0,
+    gkFull,
+  };
 
-    previousLineup=[...lineup];
+  planGenerated   = true;
+  currentBlockIdx = 0;
+
+  renderPlanTable();
+  renderMinutesTable();
+  drawPitch('pitchWrap', blocks[0].lineup, blocks[0].activeGK);
+  drawPitch('liveWrap',  blocks[0].lineup, blocks[0].activeGK);
+  renderSubList();
+  updateNextChangeBar();
+  return null;
+}
+
+/* ════════════════════════════════════════════════════════
+   PLAN RENDERING
+═════════════════════════════════════════════════════════ */
+function renderPlanTable(){
+  const half = matchLengthMins / 2;
+  let html = '';
+
+  if(planSummary){
+    const winLabel = planSummary.segsPerHalf === 1 ? 'Halftime only'
+      : `Halftime + ${planSummary.segsPerHalf-1} mid-half break${planSummary.segsPerHalf>2?'s':''} per half`;
+    const spreadTxt = planSummary.spread <= 1
+      ? '<span style="color:var(--green)">✓ Equal time achieved (±1 min)</span>'
+      : `<span style="color:var(--amber)">⚠ Spread: ${planSummary.spread} min (mathematically minimal for this squad)</span>`;
+    const gkNote = planSummary.gkFull
+      ? 'GKs: full half in goal + full half outfield'
+      : 'GKs: full half in goal + partial outfield to match squad minutes';
+    html += `<div style="background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.3);
+      border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;line-height:1.8">
+      <div style="font-weight:700;color:var(--amber);margin-bottom:4px">Plan Summary</div>
+      <div>Sub windows: <strong>${winLabel}</strong></div>
+      <div>Outfield mins: <strong>${planSummary.perPlayer}–${planSummary.perPlayerMax}'</strong></div>
+      <div>${spreadTxt}</div>
+      <div style="color:var(--muted)">${gkNote}</div>
+    </div>`;
+  }
+
+  blocks.forEach((blk, i) => {
+    const prev   = blocks[i-1];
+    const isKick = i === 0;
+    const isHalf = !isKick && Math.abs(blk.subAt - half) < 0.5;
+
+    const badge = isHalf
+      ? `<span style="background:var(--amber);color:var(--black);font-size:10px;
+           font-weight:800;padding:2px 7px;border-radius:4px;margin-left:8px;
+           letter-spacing:.5px;vertical-align:middle">HALFTIME</span>` : '';
+
+    const timeLabel = isKick ? `0' — Kickoff` : `${blk.subAt}' — change${badge}`;
+
+    // Sub pairs: "A → B" format
+    let subsHtml = '';
+    if(!isKick && blk.subs && blk.subs.length){
+      const pairs = blk.subs
+        .filter(s => s.off && s.on)
+        .map(s => `<div style="display:flex;align-items:center;gap:6px;margin:2px 0">
+          <span class="sub-off">▼ ${s.off.name}</span>
+          <span style="color:var(--muted);font-size:11px">→</span>
+          <span class="sub-on">▲ ${s.on.name}</span>
+        </div>`).join('');
+      subsHtml = `<div class="plan-subs" style="display:block;margin-top:6px">${pairs}</div>`;
+    }
+
+    html += `<div class="plan-block">
+      <div class="plan-time">${timeLabel}</div>
+      <div class="plan-names" style="margin:4px 0">${blk.lineup.map(p=>p.name).join(' · ')}</div>
+      ${subsHtml}
+      <div style="color:var(--muted);font-size:11px;margin-top:4px">
+        Plays ${blk.dur} min${blk.dur!==1?'s':''} (until ${blk.end}')
+      </div>
+    </div>`;
   });
 
-  while(blocks.length>1){
+  $('planTable').innerHTML = html;
+}
 
-    const last=
-      blocks[blocks.length-1];
+function renderMinutesTable(){
+  const gk1Name = getVal('gk1'), gk2Name = getVal('gk2');
+  const gkFull  = planSummary?.gkFull ?? false;
+  const minOk   = planSummary?.perPlayer    ?? 0;
+  const maxOk   = planSummary?.perPlayerMax ?? 0;
 
-    const prev=
-      blocks[blocks.length-2];
+  const sorted = [...playersData].sort((a,b) => (b.outfieldMinutes||0) - (a.outfieldMinutes||0));
+  const maxBar = Math.max(...sorted.map(p => p.totalMinutes||0), 1);
+  let html = '';
 
-    const changes=
-      last.lineup.filter(
-        p=>!prev.lineup.includes(p)
-      ).length;
+  sorted.forEach(p => {
+    const isGK     = p.name === gk1Name || p.name === gk2Name;
+    const shown    = p.outfieldMinutes || 0;
+    const barMins  = p.totalMinutes    || 0;
+    const pct      = Math.round(barMins / maxBar * 100);
+    let label, dot;
 
-    if(changes===0){
+    if(isGK){
+      const goalMins = matchLengthMins / 2;
+      label = `${shown}' field / ${goalMins}' goal`;
+      dot = `<span style="color:var(--muted);font-size:11px">GK</span>`;
+    } else {
+      label = `${shown}'`;
+      const ok = shown >= minOk - 1 && shown <= maxOk + 1;
+      dot = ok
+        ? `<span style="color:var(--green);font-size:11px">✓</span>`
+        : `<span style="color:var(--red);font-size:11px">!</span>`;
+    }
 
-      blocks.pop();
+    html += `<div class="mins-row">
+      <div class="mins-name" title="${p.name}">${p.name}</div>
+      <div class="mins-bar-wrap"><div class="mins-bar" style="width:${pct}%"></div></div>
+      <div class="mins-val" style="width:100px;font-size:11px;white-space:nowrap">${label}</div>
+      <div style="width:22px;text-align:center;flex-shrink:0">${dot}</div>
+    </div>`;
+  });
+  $('minutesTable').innerHTML = html;
+}
 
-    }else{
-      break;
+/* ════════════════════════════════════════════════════════
+   PITCH DRAWING
+   Lineup order: [activeGK, ...outfield]
+   Outfield placed by role:
+     DEF players → DEF coords
+     MIDC players → MID-C coord
+     MIDW players → MID-W coords
+     ATT players → ATT coord
+   GK always at bottom.
+═════════════════════════════════════════════════════════ */
+const ROLE_COORDS = {
+  gk:   [[50, 90]],
+  def:  [[25, 72],[75, 72]],
+  midc: [[50, 55]],
+  midw: [[20, 38],[80, 38]],
+  att:  [[50, 20]],
+};
+
+function pitchSVG(){
+  return `<svg class="pitch-svg" viewBox="0 0 200 260" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="200" height="260" fill="#2d6a2d"/>
+    <rect y="0"   width="200" height="26" fill="#326e32" opacity=".5"/>
+    <rect y="52"  width="200" height="26" fill="#326e32" opacity=".5"/>
+    <rect y="104" width="200" height="26" fill="#326e32" opacity=".5"/>
+    <rect y="156" width="200" height="26" fill="#326e32" opacity=".5"/>
+    <rect y="208" width="200" height="26" fill="#326e32" opacity=".5"/>
+    <rect x="4" y="4" width="192" height="252" rx="2" stroke="white" stroke-opacity=".25" stroke-width="1.5" fill="none"/>
+    <line x1="4" y1="130" x2="196" y2="130" stroke="white" stroke-opacity=".25" stroke-width="1"/>
+    <circle cx="100" cy="130" r="28" stroke="white" stroke-opacity=".25" stroke-width="1" fill="none"/>
+    <circle cx="100" cy="130" r="2" fill="white" fill-opacity=".4"/>
+    <rect x="50" y="4"   width="100" height="44" stroke="white" stroke-opacity=".2" stroke-width="1" fill="none"/>
+    <rect x="50" y="212" width="100" height="44" stroke="white" stroke-opacity=".2" stroke-width="1" fill="none"/>
+    <rect x="74" y="4"   width="52" height="20"  stroke="white" stroke-opacity=".15" stroke-width="1" fill="none"/>
+    <rect x="74" y="236" width="52" height="20"  stroke="white" stroke-opacity=".15" stroke-width="1" fill="none"/>
+    <circle cx="100" cy="38"  r="1.5" fill="white" fill-opacity=".4"/>
+    <circle cx="100" cy="222" r="1.5" fill="white" fill-opacity=".4"/>
+  </svg>`;
+}
+
+function drawPitch(wrapId, lineup, activeGK, prevLineup){
+  const wrap = $(wrapId);
+  if(!wrap) return;
+  wrap.innerHTML = pitchSVG();
+
+  // Place active GK
+  const gkSlot = ROLE_COORDS.gk[0];
+  addToken(wrap, activeGK, gkSlot[0], gkSlot[1], true, prevLineup);
+
+  // Place outfield players by their PRIMARY position
+  const outfield = lineup.filter(p => p !== activeGK);
+  const used = { def:0, midc:0, midw:0, att:0 };
+  // Order: place role-matched players first, then fallbacks
+  const placed = new Set([activeGK.name]);
+
+  const roleOrder = ['def','def','midc','midw','midw','att'];
+  // Assign each outfield player to a coord slot by their ticked role
+  const assignments = [];
+  const remaining = [...outfield];
+
+  for(const role of ['def','midc','midw','att']){
+    const coords = ROLE_COORDS[role];
+    for(let ci = 0; ci < coords.length; ci++){
+      // Find best match: has role ticked, not yet placed
+      let idx = remaining.findIndex(p => !placed.has(p.name) && p.positions[role]);
+      if(idx === -1) idx = remaining.findIndex(p => !placed.has(p.name)); // fallback
+      if(idx === -1) continue;
+      const player = remaining[idx];
+      assignments.push({ player, x: coords[ci][0], y: coords[ci][1] });
+      placed.add(player.name);
     }
   }
+  // Any remaining (shouldn't happen with correct slot counts)
+  remaining.filter(p => !placed.has(p.name)).forEach((p,i) => {
+    assignments.push({ player:p, x:50, y:50 - i*8 });
+  });
 
-  buildPlan();
-  buildMinutes();
-
-  if(blocks.length){
-
-    drawPitch(
-      blocks[0].lineup
-    );
-  }
-
-  currentIndex=0;
-
-  updateNextSub();
-}
-
-function buildPlan(){
-
-  let html="";
-
-  if(blocks.length){
-
-    html+=`
-    <div class="planBlock">
-
-      <strong>0m — Kickoff</strong><br>
-
-      ${blocks[0].lineup
-        .map(p=>p.name)
-        .join(", ")}
-
-    </div>
-    `;
-  }
-
-  for(let i=1;i<blocks.length;i++){
-
-    const block=blocks[i];
-
-    const previous=
-      blocks[i-1];
-
-    const off=
-      previous.lineup.filter(
-        p=>!block.lineup.includes(p)
-      );
-
-    const on=
-      block.lineup.filter(
-        p=>!previous.lineup.includes(p)
-      );
-
-    html+=`
-    <div class="planBlock">
-
-      <strong>${block.time}m</strong><br>
-
-      ${block.lineup
-        .map(p=>p.name)
-        .join(", ")}
-
-      <div class="small">
-
-      OFF:
-      ${off.length
-        ? off.map(p=>p.name).join(", ")
-        : "None"}
-
-      <br>
-
-      ON:
-      ${on.length
-        ? on.map(p=>p.name).join(", ")
-        : "None"}
-
-      </div>
-
-    </div>
-    `;
-  }
-
-  planTable.innerHTML=html;
-}
-
-function buildMinutes(){
-
-  let html="";
-
-  playersData
-    .sort((a,b)=>
-      b.outfieldMinutes-a.outfieldMinutes
-    )
-    .forEach(player=>{
-
-      html+=`
-      <div>
-
-        <strong>${player.name}</strong><br>
-
-        Outfield:
-        ${player.outfieldMinutes} mins
-
-        <br>
-
-        Total:
-        ${player.totalMinutes} mins
-
-      </div>
-
-      <hr>
-      `;
-    });
-
-  minutesTable.innerHTML=html;
-}
-
-function drawPitch(lineup){
-
-  pitch.innerHTML="";
-
-  const coords=[
-    [50,92],
-    [50,74],
-    [22,60],
-    [78,60],
-    [50,45],
-    [22,25],
-    [78,25]
-  ];
-
-  lineup.forEach((player,index)=>{
-
-    const el=
-      document.createElement("div");
-
-    el.className="token";
-
-    el.innerText=player.name;
-
-    el.style.left=
-      coords[index][0]+"%";
-
-    el.style.top=
-      coords[index][1]+"%";
-
-    pitch.appendChild(el);
+  assignments.forEach(({player,x,y}) => {
+    const isNew = prevLineup ? !prevLineup.includes(player) : false;
+    addToken(wrap, player, x, y, false, prevLineup ? prevLineup : null);
   });
 }
 
-function updateNextSub(){
-
-  if(!blocks[currentIndex+1]){
-
-    nextSub.innerHTML=
-      "Upcoming subs: none";
-
-    return;
-  }
-
-  const current=
-    blocks[currentIndex];
-
-  const next=
-    blocks[currentIndex+1];
-
-  const off=
-    current.lineup.filter(
-      p=>!next.lineup.includes(p)
-    );
-
-  const on=
-    next.lineup.filter(
-      p=>!current.lineup.includes(p)
-    );
-
-  nextSub.innerHTML=
-  `
-  OFF:
-  ${off.length
-    ? off.map(p=>p.name).join(", ")
-    : "None"}
-
-  <br>
-
-  ON:
-  ${on.length
-    ? on.map(p=>p.name).join(", ")
-    : "None"}
-  `;
+function addToken(wrap, player, x, y, isGK, prevLineup){
+  const isNew = prevLineup ? !prevLineup.includes(player) : false;
+  const el = document.createElement('div');
+  el.className = 'pitch-token' + (isGK ? ' gk' : '') + (isNew ? ' new-player' : '');
+  // Abbreviate long names
+  const nm = player.name;
+  el.textContent = nm.length > 10
+    ? nm.split(' ').map(w=>w[0]).join('').slice(0,4).toUpperCase()
+    : nm;
+  el.title = nm;
+  el.style.left = x + '%';
+  el.style.top  = y + '%';
+  wrap.appendChild(el);
 }
 
+/* ════════════════════════════════════════════════════════
+   MATCH TIMER
+═════════════════════════════════════════════════════════ */
 function startMatch(){
-
-  if(timer) return;
-
-  timer=setInterval(()=>{
-
-    seconds++;
-
-    const mins=
-      Math.floor(seconds/60)
-      .toString()
-      .padStart(2,"0");
-
-    const secs=
-      (seconds%60)
-      .toString()
-      .padStart(2,"0");
-
-    clock.innerText=
-      `${mins}:${secs}`;
-
-    const next=
-      blocks.find(
-        b=>b.time>seconds/60
-      );
-
-    if(next){
-
-      nextChange.innerText=
-        `Next change: ${next.time} mins`;
-    }
-
-  },1000);
+  if(timerInterval) return;
+  if(!planGenerated){ showTab('screen-setup'); showAlert('Generate a plan first.'); return; }
+  timerInterval = setInterval(tickTimer, 1000);
+  $('btnStart').textContent = '▶ Running…';
 }
 
 function pauseMatch(){
-
-  clearInterval(timer);
-
-  timer=null;
+  clearInterval(timerInterval); timerInterval = null;
+  $('btnStart').textContent = '▶ Start';
 }
 
 function resetMatch(){
-
-  pauseMatch();
-
-  seconds=0;
-
-  clock.innerText="00:00";
+  pauseMatch(); elapsedSeconds = 0; currentBlockIdx = 0;
+  updateClockDisplay(); updateNextChangeBar(); renderSubList();
+  $('halfLabel').textContent = 'PRE-MATCH';
+  $('progressFill').style.width = '0%';
+  if(blocks.length) drawPitch('liveWrap', blocks[0].lineup, blocks[0].activeGK, null);
 }
 
-function nextBlock(){
-
-  currentIndex++;
-
-  if(currentIndex>=blocks.length){
-
-    currentIndex=
-      blocks.length-1;
-
-    updateNextSub();
-
-    return;
+function tickTimer(){
+  elapsedSeconds++;
+  updateClockDisplay();
+  const em = elapsedSeconds / 60;
+  $('progressFill').style.width = Math.min(100, em / matchLengthMins * 100) + '%';
+  if(em >= matchLengthMins){ $('halfLabel').textContent='FULL TIME'; pauseMatch(); return; }
+  $('halfLabel').textContent = em < matchLengthMins/2 ? 'FIRST HALF' : 'SECOND HALF';
+  if(currentBlockIdx < blocks.length - 1){
+    if(em >= blocks[currentBlockIdx+1].subAt) advanceBlock();
   }
-
-  drawPitch(
-    blocks[currentIndex].lineup
-  );
-
-  updateNextSub();
+  updateNextChangeBar();
 }
 
-renderPlayers();
+function advanceBlock(){
+  const prev = blocks[currentBlockIdx];
+  currentBlockIdx = Math.min(currentBlockIdx+1, blocks.length-1);
+  const blk  = blocks[currentBlockIdx];
+  drawPitch('liveWrap', blk.lineup, blk.activeGK, prev.lineup);
+  renderSubList();
+}
 
+function forceNextBlock(){
+  if(!planGenerated){ showAlert('Generate a plan first.'); return; }
+  advanceBlock();
+}
+
+function updateClockDisplay(){
+  const m = Math.floor(elapsedSeconds/60).toString().padStart(2,'0');
+  const s = (elapsedSeconds%60).toString().padStart(2,'0');
+  $('clock').textContent = `${m}:${s}`;
+}
+
+function updateNextChangeBar(){
+  if(!blocks.length) return;
+  const em = elapsedSeconds / 60;
+  const next = blocks.slice(1).find(b => b.subAt > em + 0.05);
+  if(next){
+    const ml = Math.ceil(next.subAt - em);
+    $('nextChangeValue').textContent = `${next.subAt}' (in ~${ml} min${ml!==1?'s':''})`;
+  } else {
+    $('nextChangeValue').textContent = 'No more changes';
+  }
+}
+
+function renderSubList(){
+  if(!blocks.length){ $('subList').innerHTML=''; return; }
+  let html = '';
+  const half = matchLengthMins / 2;
+  for(let i = Math.max(1, currentBlockIdx+1); i < blocks.length; i++){
+    const blk    = blocks[i];
+    const subs   = blk.subs || [];
+    if(!subs.length) continue;
+    const isHalf = Math.abs(blk.subAt - half) < 0.5;
+    const pairs  = subs.filter(s=>s.off&&s.on).map(s =>
+      `<div style="display:flex;align-items:center;gap:6px;padding:2px 0">
+        <span class="sub-off" style="font-size:13px">▼ ${s.off.name}</span>
+        <span style="color:var(--muted);font-size:12px">→</span>
+        <span class="sub-on"  style="font-size:13px">▲ ${s.on.name}</span>
+      </div>`).join('');
+    html += `<div class="sub-card">
+      <div class="sub-card-time">At ${blk.subAt}'${isHalf?' — Halftime':''}</div>
+      ${pairs}
+    </div>`;
+  }
+  $('subList').innerHTML = html || '<p style="color:var(--muted);font-size:13px">No more substitutions</p>';
+}
+
+/* ════════════════════════════════════════════════════════
+   INIT
+═════════════════════════════════════════════════════════ */
+(function init(){
+  const saved = JSON.parse(localStorage.getItem('cpe_squad') || '[]');
+  if(saved.length){ $('squadCount').value = saved.length; buildPlayerInputs(); }
+})();
 </script>
 
 </body>
