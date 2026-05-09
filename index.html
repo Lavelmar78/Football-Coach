@@ -3,9 +3,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0d0f12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Coach Pro">
+<meta name="mobile-web-app-capable" content="yes">
 <title>Coach Pro Elite</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 /* ─── TOKENS ─────────────────────────────────────────── */
@@ -27,9 +33,10 @@
   --muted:#7a8694;
   --radius:14px;
   --tab-h:60px;
+  --safe-bottom:env(safe-area-inset-bottom, 0px);
 }
 
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
 
 body{
 font-family:‘Barlow’,sans-serif;
@@ -37,15 +44,20 @@ background:var(–black);
 color:var(–text);
 min-height:100dvh;
 overflow-x:hidden;
+/* Prevent content sliding under notch */
+padding-top:env(safe-area-inset-top);
 }
 
 /* ─── HEADER ─────────────────────────────────────────── */
 header{
-position:sticky;top:0;z-index:100;
+position:sticky;
+top:0;z-index:100;
 background:var(–black);
 border-bottom:1px solid var(–border);
 display:flex;align-items:center;gap:10px;
 padding:12px 16px;
+padding-left:max(16px, env(safe-area-inset-left));
+padding-right:max(16px, env(safe-area-inset-right));
 }
 header svg{flex-shrink:0;}
 .hdr-title{
@@ -63,7 +75,10 @@ padding:3px 8px;border-radius:4px;
 }
 
 /* ─── SCREENS ────────────────────────────────────────── */
-.screen{display:none;padding:14px 14px calc(var(–tab-h) + 20px);}
+.screen{
+display:none;
+padding:14px max(14px, env(safe-area-inset-right)) calc(var(–tab-h) + env(safe-area-inset-bottom) + 20px) max(14px, env(safe-area-inset-left));
+}
 .screen.active{display:block;animation:fadeUp .22s ease both;}
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
@@ -92,10 +107,12 @@ input[type=“number”],input[type=“text”],select{
 width:100%;background:var(–card2);
 border:1px solid var(–border2);
 color:var(–text);border-radius:9px;
-padding:10px 12px;font-size:15px;
+padding:10px 12px;font-size:16px;/* 16px prevents iOS auto-zoom */
 font-family:‘Barlow’,sans-serif;
 outline:none;transition:border .15s;
 margin-bottom:14px;
+-webkit-appearance:none;
+appearance:none;
 }
 input:focus,select:focus{border-color:var(–amber);}
 select option{background:var(–card2);}
@@ -131,6 +148,9 @@ border:none;cursor:pointer;font-family:‘Barlow Condensed’,sans-serif;
 font-weight:700;font-size:16px;letter-spacing:.5px;
 transition:opacity .15s,transform .1s;
 margin-bottom:10px;
+-webkit-appearance:none;
+appearance:none;
+touch-action:manipulation;
 }
 .btn:active{transform:scale(.97);opacity:.85;}
 .btn-primary{background:var(–amber);color:var(–black);}
@@ -217,7 +237,7 @@ position:absolute;inset:0;width:100%;height:100%;
 position:absolute;transform:translate(-50%,-50%);
 background:var(–black);border:2px solid var(–amber);
 border-radius:20px;padding:4px 8px;
-font-family:‘Barlow Condensed’,sans-serif;
+font-family:‘Barlow Condensed’,-apple-system,sans-serif;
 font-weight:700;font-size:12px;color:var(–amber);
 white-space:nowrap;max-width:80px;
 overflow:hidden;text-overflow:ellipsis;
@@ -225,6 +245,7 @@ text-align:center;
 transition:all .4s cubic-bezier(.34,1.56,.64,1);
 box-shadow:0 2px 8px rgba(0,0,0,.5);
 z-index:2;
+-webkit-font-smoothing:antialiased;
 }
 .pitch-token.gk{
 background:var(–amber);color:var(–black);
@@ -239,7 +260,7 @@ animation:popIn .4s cubic-bezier(.34,1.56,.64,1) both;
 /* ─── MATCH SCREEN ───────────────────────────────────── */
 .clock-display{
 font-family:‘Barlow Condensed’,sans-serif;
-font-weight:800;font-size:72px;letter-spacing:2px;
+font-weight:800;font-size:clamp(48px,15vw,72px);letter-spacing:2px;
 text-align:center;color:var(–amber);
 line-height:1;padding:20px 0 10px;
 }
@@ -278,10 +299,13 @@ transition:width 1s linear;
 /* ─── TABBAR ─────────────────────────────────────────── */
 .tabbar{
 position:fixed;bottom:0;left:0;right:0;z-index:200;
-height:var(–tab-h);
 background:var(–surface);
 border-top:1px solid var(–border);
 display:flex;
+/* Extend behind home indicator */
+padding-bottom:env(safe-area-inset-bottom);
+padding-left:env(safe-area-inset-left);
+padding-right:env(safe-area-inset-right);
 }
 .tabbar-btn{
 flex:1;display:flex;flex-direction:column;
@@ -291,7 +315,10 @@ font-family:‘Barlow Condensed’,sans-serif;
 font-weight:600;font-size:11px;letter-spacing:.5px;
 text-transform:uppercase;color:var(–muted);
 transition:color .15s;
-padding-bottom:env(safe-area-inset-bottom,0);
+min-height:var(–tab-h);
+padding:8px 0;
+-webkit-tap-highlight-color:transparent;
+touch-action:manipulation;
 }
 .tabbar-btn svg{transition:color .15s;}
 .tabbar-btn.active{color:var(–amber);}
@@ -705,33 +732,38 @@ function generatePlan(){
     return segs;
   }
 
-  /* ── GK MODE ─────────────────────────────────────────
-     gkFull=true:  off-GK is FORCED into every segment of
-       their outfield half (plays the full half outfield).
-       Lineup = activeGK(goal) + offGK(outfield) + 5 from pool.
+  /* ── GK MODE ──────────────────────────────────────────
+     gkFull=true:
+       off-GK is FORCED into every segment of their outfield
+       half (plays the full half outfield, full half in goal).
+       Lineup per seg = activeGK(goal) + offGK(outfield) + 5 from pool.
 
-     gkFull=false: off-GK joins the POOL for their outfield
-       half and rotates in/out like any other player, getting
-       their fair share of outfield minutes.
-       Lineup = activeGK(goal) + 6 from pool (pool includes
-       the off-GK for segments in their outfield half).        */
+     gkFull=false:
+       Each GK plays their half in goal, then earns fair outfield
+       time in their off-half. Fair share = target_total - half,
+       where target_total = matchLen * 7 / totalPlayers.
+       We PRE-ASSIGN which off-half segments each GK plays
+       (greedy: pick fewest segments that sum to their target).
+       Those segments: activeGK(goal) + offGK(outfield) + 5 from pool.
+       Other segments: activeGK(goal) + 6 from pool (GK on bench).  */
 
-  // Pool used for spread simulation always = allNonGK (6 slots from pool).
-  // When gkFull, off-GK takes 1 of those 6 → effectively 5 slots for allNonGK.
-  // When !gkFull, off-GK IS in the pool → 6 slots for (allNonGK + offGK).
-  // Simulating spread: use allNonGK.length for !gkFull (GKs are already in pool),
-  //   use allNonGK.length for gkFull with 5 slots.
+  const PITCH      = 7;
+  const N_total    = playersData.length;
+  const targetTotal = matchLengthMins * PITCH / N_total;
+  const gkOutfieldTarget = Math.max(0, targetTotal - half);
 
-  const poolSlotsPerSeg = gkFull ? SLOTS - 1 : SLOTS;
+  // Pool slots filled from allNonGK:
+  //   gkFull=true:  5 (off-GK takes 1 slot every off-half seg)
+  //   gkFull=false: 5 when GK plays that seg, 6 otherwise
+  // For simSpread use 5 slots (conservative — real spread ≤ this)
+  const poolSlotsForSim = gkFull ? SLOTS - 1 : SLOTS - 1;
 
   function simSpread(segs){
-    // Simulate with the rotating pool only (excludes forced off-GK in gkFull).
-    const pool = allNonGK;
-    const N    = pool.length;
-    const acc  = new Array(N).fill(0);
+    const N   = allNonGK.length;
+    const acc = new Array(N).fill(0);
     for(const seg of segs){
       const order = Array.from({length:N},(_,i)=>i).sort((a,b)=>acc[a]-acc[b]);
-      order.slice(0, Math.min(poolSlotsPerSeg, N)).forEach(i => acc[i] += seg.dur);
+      order.slice(0, Math.min(poolSlotsForSim, N)).forEach(i => acc[i] += seg.dur);
     }
     return N ? Math.max(...acc) - Math.min(...acc) : 0;
   }
@@ -744,18 +776,47 @@ function generatePlan(){
   }
   const segments = buildSegs(segsPerHalf);
 
-  // Role slots filled from pool each segment:
-  //   gkFull=true:  5 roles (off-GK takes 1 slot outside roleSeq)
-  //   gkFull=false: 6 roles (all 6 filled from pool including off-GK when eligible)
-  const roleSeq = gkFull
-    ? ['def','def','midc','midw','att']
-    : ['def','def','midc','midw','midw','att'];
+  /* ── Pre-assign GK outfield segments (!gkFull only) ──
+     For each GK, find the off-half segments they play outfield.
+     Greedy: pick smallest segments first until target is reached
+     (minimises overshoot past target).                          */
+  function assignGKSegs(offHalfSegs, target){
+    if(target <= 0) return new Set();
+    const sorted = [...offHalfSegs].sort((a,b) => a.dur - b.dur);
+    const ids    = new Set();
+    let   rem    = target;
+    for(const seg of sorted){
+      if(rem <= 0) break;
+      ids.add(seg.subAt);   // use subAtMinute as unique key
+      rem -= seg.dur;
+    }
+    return ids;   // Set of subAtMinute values where GK plays outfield
+  }
 
+  const firstHalfSegs  = segments.filter(s => s.end <= half + 0.01);
+  const secondHalfSegs = segments.filter(s => s.end >  half + 0.01);
+
+  // gk1 plays 1st half in goal → outfield during 2nd half segs
+  // gk2 plays 2nd half in goal → outfield during 1st half segs
+  const gk1OutfieldSegs = gkFull
+    ? new Set(secondHalfSegs.map(s => s.subAt))   // all 2nd half
+    : assignGKSegs(secondHalfSegs, gkOutfieldTarget);
+  const gk2OutfieldSegs = gkFull
+    ? new Set(firstHalfSegs.map(s => s.subAt))    // all 1st half
+    : assignGKSegs(firstHalfSegs,  gkOutfieldTarget);
+
+  /* ── Role sequences ──────────────────────────────────
+     When GK plays outfield this segment: 5 pool slots + GK forced.
+       roleSeq5 = DEF DEF MIDC MIDW ATT
+     When GK benched this segment: 6 pool slots.
+       roleSeq6 = DEF DEF MIDC MIDW MIDW ATT               */
+  const roleSeq5 = ['def','def','midc','midw','att'];
+  const roleSeq6 = ['def','def','midc','midw','midw','att'];
+
+  /* ── Score-based pick: prefer role, balance time ────── */
   function pickForRole(role, usedSet, candidatePool, segDur){
     const available = candidatePool.filter(p => !usedSet.has(p.name));
     if(!available.length) return null;
-    // Score = outfieldMins + segDur penalty if wrong role.
-    // Prefer role-correct players while keeping time balanced.
     return available.reduce((best, p) => {
       const sP = p.outfieldMins + (p.positions[role] ? 0 : segDur);
       const sB = best.outfieldMins + (best.positions[role] ? 0 : segDur);
@@ -770,41 +831,43 @@ function generatePlan(){
 
   for(const seg of segments){
     const inFirst  = seg.end <= half + 0.01;
-    const activeGK = inFirst ? gk1 : gk2;  // in goal this segment
-    const offGK    = inFirst ? gk2 : gk1;  // outfield candidate this segment
+    const activeGK = inFirst ? gk1 : gk2;
+    const offGK    = inFirst ? gk2 : gk1;
+    const gkPlaysOutfield = inFirst
+      ? gk2OutfieldSegs.has(seg.subAt)
+      : gk1OutfieldSegs.has(seg.subAt);
 
     const lineup = [];
     const used   = new Set();
 
-    // Active GK always in goal
+    // Active GK in goal
     lineup.push(activeGK);
     used.add(activeGK.name);
 
-    if(gkFull){
-      // OFF-GK forced into outfield for their entire off-half
+    const poolShuffled = shuffle(allNonGK);
+
+    if(gkPlaysOutfield){
+      // Off-GK forced outfield this segment
       lineup.push(offGK);
       used.add(offGK.name);
-      // Remaining 5 slots from allNonGK pool
-      const poolShuffled = shuffle(allNonGK);
-      for(const role of roleSeq){
+      // Fill 5 remaining slots from pool
+      for(const role of roleSeq5){
         const picked = pickForRole(role, used, poolShuffled, seg.dur);
         if(!picked){ showAlert('Not enough players.'); blocks=[]; return 'fail'; }
         lineup.push(picked);
         used.add(picked.name);
       }
     } else {
-      // OFF-GK joins pool for their off-half — competes for outfield slots
-      // Build pool = allNonGK + offGK (shuffled together)
-      const pool = shuffle([...allNonGK, offGK]);
-      for(const role of roleSeq){
-        const picked = pickForRole(role, used, pool, seg.dur);
+      // GK on bench — fill all 6 outfield slots from pool
+      for(const role of roleSeq6){
+        const picked = pickForRole(role, used, poolShuffled, seg.dur);
         if(!picked){ showAlert('Not enough players.'); blocks=[]; return 'fail'; }
         lineup.push(picked);
         used.add(picked.name);
       }
     }
 
-    // Accrue immediately so next segment picks correctly
+    // Accrue minutes immediately
     lineup.forEach(p => { p.totalMins += seg.dur; });
     lineup.forEach(p => { if(p !== activeGK) p.outfieldMins += seg.dur; });
 
