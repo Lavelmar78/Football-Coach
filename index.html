@@ -632,9 +632,8 @@ function buildPlayerInputs(){
       <div class="role-chips">
         ${['DEF','MID-C','MID-W','ATT'].map((r,ri) => {
           const k = ['def','midc','midw','att'][ri];
-          return `<label class="role-chip" onclick="this.querySelector('input').click()">
-            <input type="checkbox" id="p${i}_${k}" ${p[k]?'checked':''}
-              onchange="this.closest('.role-chip').classList.toggle('checked',this.checked)">
+          return `<label class="role-chip">
+            <input type="checkbox" id="p${i}_${k}" ${p[k]?'checked':''}>
             <span>${r}</span>
           </label>`;
         }).join('')}
@@ -642,9 +641,15 @@ function buildPlayerInputs(){
     </div>`;
   }
   $('playersContainer').innerHTML = html;
-  // Initialise .checked class for Safari :has() fallback
-  document.querySelectorAll('.role-chip input:checked').forEach(cb => {
-    cb.closest('.role-chip').classList.add('checked');
+  // Sync .checked class and attach change listener for all role chips
+  $('playersContainer').querySelectorAll('.role-chip').forEach(chip => {
+    const cb = chip.querySelector('input[type="checkbox"]');
+    // Set initial visual state
+    chip.classList.toggle('checked', cb.checked);
+    // Keep visual state in sync when checkbox changes
+    cb.addEventListener('change', () => {
+      chip.classList.toggle('checked', cb.checked);
+    });
   });
   $('playersSection').style.display = '';
   refreshGKSelectors();
