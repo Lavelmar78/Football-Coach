@@ -7,8 +7,8 @@
 <meta name="theme-color" content="#0d0f12">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Coach Pro">
-<title>Coach Pro Elite</title>
+<meta name="apple-mobile-web-app-title" content="Assistant Manager">
+<title>Assistant Manager</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
@@ -132,7 +132,7 @@ select option{background:#252b33;}
 <body>
 <header>
   <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="13" stroke="#f5a623" stroke-width="2"/><path d="M14 6l2.2 6.8H23l-5.6 4 2.2 6.8L14 19.5l-5.6 4 2.2-6.8L5 10.8h6.8z" fill="#f5a623"/></svg>
-  <div><div class="hdr-title">Coach Pro Elite</div><div class="hdr-sub">Match Manager</div></div>
+  <div><div class="hdr-title">Assistant Manager</div><div class="hdr-sub">Match Manager</div></div>
   <div class="hdr-right">
     <span class="score-hdr" id="scoreHdr" onclick="openModal('modal-settings')">0 – 0</span>
     <div class="hdr-badge">v3</div>
@@ -564,7 +564,7 @@ function generatePlan(){
     var remaining=players.slice();
     var slotOrd=roles.map(function(r,ri){
       return {ri:ri,role:r,count:remaining.filter(function(p){return p.positions[r];}).length};
-    }).sort(function(a,b){return a.count-b.count;});
+    }).sort(function(a,b){return a.count!==b.count?a.count-b.count:a.ri-b.ri;});
     slotOrd.forEach(function(s){
       if(assigned[s.ri]) return;
       var elig=remaining.filter(function(p){return p.positions[s.role];});
@@ -598,7 +598,7 @@ function generatePlan(){
     vacated.sort(function(a,b){
       var ca=incoming.filter(function(p){return p.positions[roles[a]];}).length;
       var cb=incoming.filter(function(p){return p.positions[roles[b]];}).length;
-      return ca-cb;
+      return ca!==cb?ca-cb:a-b;
     });
     var inRem=incoming.slice();
     vacated.forEach(function(ri){
@@ -640,6 +640,29 @@ function generatePlan(){
     rmap[blk.activeGK.name]=-1;
     roleMaps.push(rmap);
     blk.roleMap=rmap;
+
+    // Also compute a fresh displayMap (same algo as drawPitch) for position labels
+    // This is what shows in the report and plan table
+    var dplaced=new Array(subRoles.length).fill(null);
+    var drem=outfield.slice();
+    var dSlotOrd=subRoles.map(function(r,ri){
+      return {ri:ri,role:r,count:drem.filter(function(p){return p.positions[r];}).length};
+    }).sort(function(a,b){return a.count!==b.count?a.count-b.count:a.ri-b.ri;});
+    dSlotOrd.forEach(function(s){
+      if(dplaced[s.ri]) return;
+      var elig=drem.filter(function(p){return p.positions[s.role];});
+      if(!elig.length) return;
+      elig.sort(function(a,b){
+        return Object.values(a.positions).filter(Boolean).length
+             - Object.values(b.positions).filter(Boolean).length;
+      });
+      dplaced[s.ri]=elig[0]; drem.splice(drem.indexOf(elig[0]),1);
+    });
+    for(var dri=0;dri<subRoles.length;dri++){if(!dplaced[dri]&&drem.length)dplaced[dri]=drem.shift();}
+    var dmap={};
+    dplaced.forEach(function(p,ri){if(p)dmap[p.name]=ri;});
+    dmap[blk.activeGK.name]=-1;
+    blk.displayMap=dmap;
   }
 
   // Build sub pairs using stable maps -- guaranteed like-for-like by slot
@@ -680,27 +703,25 @@ function drawPitch(wrapId,lineup,activeGK,prevLineup){
   const coords=FORMATION_COORDS[currentFormation]||PITCH_COORDS_DEFAULT;
   const roles=FORMATION6[currentFormation]||['def','def','midc','midw','att','att'];
   const outfield=lineup.filter(function(p){return p!==activeGK;});
-  const placed=new Array(roles.length).fill(null);
-  const unassigned=outfield.slice();
 
-  // Pass 1: fill slots where player's ONLY roles match exactly (most specific first)
-  // e.g. a player with only 'midc' ticked goes into midc slot before a multi-role player
-  roles.forEach(function(role,si){
-    if(placed[si])return;
-    // Prefer players whose ticked roles include this role AND who have no higher-priority role
-    // Priority order: def > midc > midw > att (positional specificity)
-    const priority=['def','midc','midw','att'];
-    const idx=unassigned.findIndex(function(p){
-      if(!p.positions[role])return false;
-      // Check no other unassigned slot later wants this player more specifically
-      return true;
+  // Scarcity-first assignment: rarest role slot filled first,
+  // specialist players (fewest roles ticked) preferred for their slot.
+  var placed=new Array(roles.length).fill(null);
+  var remaining=outfield.slice();
+  var slotOrd=roles.map(function(r,ri){
+    return {ri:ri,role:r,count:remaining.filter(function(p){return p.positions[r];}).length};
+  }).sort(function(a,b){return a.count!==b.count?a.count-b.count:a.ri-b.ri;});
+  slotOrd.forEach(function(s){
+    if(placed[s.ri]) return;
+    var elig=remaining.filter(function(p){return p.positions[s.role];});
+    if(!elig.length) return;
+    elig.sort(function(a,b){
+      return Object.values(a.positions).filter(Boolean).length
+           - Object.values(b.positions).filter(Boolean).length;
     });
-    if(idx!==-1){placed[si]=unassigned.splice(idx,1)[0];}
+    placed[s.ri]=elig[0]; remaining.splice(remaining.indexOf(elig[0]),1);
   });
-  // Pass 2: fill remaining empty slots with any leftover player
-  roles.forEach(function(role,si){
-    if(!placed[si]&&unassigned.length)placed[si]=unassigned.shift();
-  });
+  for(var ri=0;ri<roles.length;ri++){if(!placed[ri]&&remaining.length)placed[ri]=remaining.shift();}
 
   var addTok=function(player,x,y,isGK){
     const isNew=prevLineup?!prevLineup.includes(player):false;
@@ -712,7 +733,7 @@ function drawPitch(wrapId,lineup,activeGK,prevLineup){
     wrap.appendChild(el);
   };
   addTok(activeGK,coords[0][0],coords[0][1],true);
-  placed.forEach(function(player,i){if(!player)return;const c=coords[i+1]||[50,50];addTok(player,c[0],c[1],false);});
+  placed.forEach(function(player,i){if(!player)return;var co=coords[i+1]||[50,50];addTok(player,co[0],co[1],false);});
 }
 
 /* PLAN RENDERING */
@@ -733,12 +754,14 @@ function renderPlanTable(){
     if(!isKick&&blk.subs&&blk.subs.length){
       var posRoles=FORMATION6[currentFormation]||['def','def','midc','midw','att','att'];
       var rl={'def':'DEF','midc':'MID-C','midw':'MID-W','att':'ATT'};
-      // Use stored roleMap (stable across blocks) instead of recomputing
+      // Use roleMap (stable across blocks) for position labels
+      // Continuing players keep their position label -- no false position changes
       function rmToLabels(b){
         var m={};
-        if(b.roleMap){
-          Object.keys(b.roleMap).forEach(function(name){
-            var ri=b.roleMap[name];
+        var src=b.roleMap;
+        if(src){
+          Object.keys(src).forEach(function(name){
+            var ri=src[name];
             m[name]=ri===-1?'GK':(rl[posRoles[ri]]||posRoles[ri]);
           });
         }
@@ -956,9 +979,10 @@ function buildMatchReport(){
   var rl={'def':'DEF','midc':'MID-C','midw':'MID-W','att':'ATT'};
   var pm=function(blk){
     var m={};
-    if(blk.roleMap){
-      Object.keys(blk.roleMap).forEach(function(name){
-        var ri=blk.roleMap[name];
+    var src=blk.roleMap;
+    if(src){
+      Object.keys(src).forEach(function(name){
+        var ri=src[name];
         m[name]=ri===-1?'GK':(rl[roles[ri]]||roles[ri]);
       });
     }
