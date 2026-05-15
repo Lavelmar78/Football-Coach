@@ -17,14 +17,30 @@
 :root{--black:#0d0f12;--surface:#161a1f;--card:#1e2329;--card2:#252b33;--border:rgba(255,255,255,.08);--border2:rgba(255,255,255,.14);--amber:#f5a623;--red:#e84040;--green:#3ecf6c;--text:#e8ecf0;--muted:#7a8694;--radius:14px;--tab-h:60px;}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased;}
 html{color-scheme:dark;}
-body{font-family:'Barlow',-apple-system,sans-serif;background:var(--black);color:var(--text);min-height:100dvh;overflow-x:hidden;overscroll-behavior:none;padding-top:env(safe-area-inset-top);color-scheme:dark;}
-header{position:sticky;top:0;z-index:100;background:var(--black);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;padding:12px max(16px,env(safe-area-inset-right)) 12px max(16px,env(safe-area-inset-left));}
+html,body{height:100%;height:100dvh;}
+body{font-family:'Barlow',-apple-system,sans-serif;background:var(--black);color:var(--text);
+  overflow:hidden;overscroll-behavior:none;color-scheme:dark;
+  display:flex;flex-direction:column;}
+#app-shell{
+  display:flex;flex-direction:column;
+  height:100%;height:100dvh;
+  padding-top:env(safe-area-inset-top);
+  overflow:hidden;
+}
+#scroll-area{
+  flex:1;
+  overflow-y:auto;
+  overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+}
+header{position:sticky;top:0;z-index:100;background:var(--black);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;padding:12px max(16px,env(safe-area-inset-right)) 12px max(16px,env(safe-area-inset-left));flex-shrink:0;}
 .hdr-title{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:22px;color:var(--amber);line-height:1;}
 .hdr-sub{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;}
 .hdr-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
 .hdr-badge{background:var(--amber);color:var(--black);font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:11px;padding:3px 8px;border-radius:4px;}
 .score-hdr{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:20px;color:var(--amber);letter-spacing:2px;cursor:pointer;display:none;}
-.screen{display:none;padding:14px max(14px,env(safe-area-inset-right)) calc(var(--tab-h) + env(safe-area-inset-bottom) + 20px) max(14px,env(safe-area-inset-left));}
+.screen{display:none;padding:14px max(14px,env(safe-area-inset-right)) 20px max(14px,env(safe-area-inset-left));}
 .screen.active{display:block;animation:fadeUp .2s ease both;}
 @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px;color-scheme:dark;}
@@ -117,7 +133,7 @@ select option{background:#252b33;}
 .progress-fill{height:100%;background:var(--amber);border-radius:2px;transition:width 1s linear;}
 /* formation grid replaced with dropdown */
 .share-box{background:#252b33;border-radius:8px;padding:12px;font-size:13px;line-height:1.8;color:var(--text);white-space:pre-wrap;word-break:break-word;margin-bottom:12px;max-height:200px;overflow-y:auto;user-select:text;-webkit-user-select:text;cursor:text;}
-.tabbar{position:fixed;bottom:0;left:0;right:0;z-index:200;background:#161a1f;border-top:1px solid rgba(255,255,255,.08);display:flex;padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);}
+.tabbar{position:relative;z-index:200;background:#161a1f;border-top:1px solid rgba(255,255,255,.08);display:flex;padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);flex-shrink:0;}
 .tabbar-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;background:none;border:none;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);min-height:var(--tab-h);padding:8px 0;-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:color .15s;}
 .tabbar-btn.active{color:var(--amber);}
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;align-items:flex-end;justify-content:center;}
@@ -130,6 +146,8 @@ select option{background:#252b33;}
 </style>
 </head>
 <body>
+<div id="app-shell">
+<div id="scroll-area">
 <header>
   <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="13" stroke="#f5a623" stroke-width="2"/><path d="M14 6l2.2 6.8H23l-5.6 4 2.2 6.8L14 19.5l-5.6 4 2.2-6.8L5 10.8h6.8z" fill="#f5a623"/></svg>
   <div><div class="hdr-title">Assistant Manager</div><div class="hdr-sub">Match Manager</div></div>
@@ -252,8 +270,8 @@ select option{background:#252b33;}
   <div class="card"><div class="card-title">Live Lineup</div><div class="pitch-wrap" id="liveWrap"></div></div>
 </div>
 
+</div><!-- /scroll-area -->
 <!-- TABBAR -->
-
 <div class="tabbar">
   <button class="tabbar-btn active" id="tab-setup" onclick="showTab('screen-setup')">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
@@ -267,7 +285,8 @@ select option{background:#252b33;}
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
     Match
   </button>
-</div>
+</div><!-- /tabbar -->
+</div><!-- /app-shell -->
 
 <!-- MODALS -->
 
