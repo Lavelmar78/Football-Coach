@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="en" style="color-scheme:dark;background:#0d0f12">
 <head>
 <meta charset="UTF-8">
@@ -136,6 +135,22 @@ select option{background:#252b33;}
 .tabbar{position:relative;z-index:200;background:#161a1f;border-top:1px solid rgba(255,255,255,.08);display:flex;padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);flex-shrink:0;}
 .tabbar-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;background:none;border:none;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);min-height:var(--tab-h);padding:8px 0;-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:color .15s;}
 .tabbar-btn.active{color:var(--amber);}
+.hist-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;transition:border-color .15s;}
+.hist-card:active{border-color:var(--amber);}
+.hist-result{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:28px;color:var(--text);line-height:1;}
+.hist-result.win{color:var(--green);}
+.hist-result.loss{color:var(--red);}
+.hist-result.draw{color:var(--amber);}
+.hist-meta{font-size:12px;color:var(--muted);margin-top:3px;}
+.hist-detail{font-size:13px;color:var(--text);margin-top:8px;padding-top:8px;border-top:1px solid var(--border);}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+.stat-box{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;}
+.stat-box-val{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:26px;color:var(--amber);}
+.stat-box-lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:2px;}
+.analysis-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.analysis-row:last-child{border-bottom:none;}
+.analysis-bar-wrap{width:80px;height:6px;background:#252b33;border-radius:3px;overflow:hidden;display:inline-block;margin:0 6px;vertical-align:middle;}
+.analysis-bar{height:100%;border-radius:3px;}
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;align-items:flex-end;justify-content:center;}
 .modal-overlay.open{display:flex;}
 .modal{background:#1e2329;border-radius:20px 20px 0 0;padding:20px;padding-bottom:calc(20px + env(safe-area-inset-bottom));width:100%;max-height:80dvh;overflow-y:auto;}
@@ -158,7 +173,6 @@ select option{background:#252b33;}
 </header>
 
 <!-- SETUP -->
-
 <div id="screen-setup" class="screen active">
   <div class="card">
     <div class="card-title">Match Settings</div>
@@ -166,6 +180,8 @@ select option{background:#252b33;}
       <div><label class="field-label">Match Length (mins)</label><input id="matchLength" type="number" value="52" min="10" max="120"></div>
       <div><label class="field-label">Squad Size</label><input id="squadCount" type="number" value="11" min="7" max="20"></div>
     </div>
+    <label class="field-label">Opponent</label>
+    <input type="text" id="opponentName" placeholder="e.g. Rovers FC">
     <label class="toggle-row" for="gkMode"><input type="checkbox" id="gkMode" checked><span class="toggle-pill"></span><span class="toggle-label">GKs: full half goal + full half outfield</span></label>
     <label class="toggle-row" for="alertMode"><input type="checkbox" id="alertMode" checked><span class="toggle-pill"></span><span class="toggle-label">Vibrate &amp; beep 1 min before subs</span></label>
     <div id="alertBox" class="alert"></div>
@@ -210,7 +226,6 @@ select option{background:#252b33;}
 </div>
 
 <!-- PLAN -->
-
 <div id="screen-plan" class="screen">
   <div class="btn-row">
     <button class="btn btn-secondary btn-sm" style="flex:1" onclick="onGeneratePlan()">Regenerate</button>
@@ -227,7 +242,6 @@ select option{background:#252b33;}
 </div>
 
 <!-- MATCH -->
-
 <div id="screen-match" class="screen">
   <div class="score-row">
     <div class="score-team">
@@ -270,6 +284,24 @@ select option{background:#252b33;}
   <div class="card"><div class="card-title">Live Lineup</div><div class="pitch-wrap" id="liveWrap"></div></div>
 </div>
 
+<!-- HISTORY -->
+<div id="screen-history" class="screen">
+  <div class="card">
+    <div class="card-title">Season Overview</div>
+    <div class="stat-grid" id="histOverview"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Analysis</div>
+    <div id="histAnalysis"></div>
+  </div>
+  <div id="histMatches"></div>
+  <div class="btn-row">
+    <button class="btn btn-secondary btn-sm" style="flex:1" onclick="exportHistoryJSON()">Export History</button>
+    <label class="btn btn-secondary btn-sm" style="flex:1;cursor:pointer">Import History<input type="file" accept=".json" style="display:none" onchange="importHistory(this.files[0])"></label>
+  </div>
+  <button class="btn btn-danger btn-sm" onclick="clearHistory()" style="width:100%">Clear Match History</button>
+</div>
+
 </div><!-- /scroll-area -->
 <!-- TABBAR -->
 <div class="tabbar">
@@ -285,11 +317,14 @@ select option{background:#252b33;}
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
     Match
   </button>
+  <button class="tabbar-btn" id="tab-history" onclick="showTab('screen-history');buildHistoryScreen();">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    History
+  </button>
 </div><!-- /tabbar -->
 </div><!-- /app-shell -->
 
 <!-- MODALS -->
-
 <div class="modal-overlay" id="modal-settings" onclick="closeModal(event,'modal-settings')">
   <div class="modal" onclick="event.stopPropagation()">
     <button class="modal-close" onclick="closeModal(null,'modal-settings')">x</button>
@@ -326,10 +361,10 @@ select option{background:#252b33;}
   <div class="modal" onclick="event.stopPropagation()">
     <button class="modal-close" onclick="closeModal(null,'modal-stats')">x</button>
     <div class="modal-title">Season Stats</div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:12px">P=Played, M=Missed, Mins=Actual, Attr=Attributed (absence credit), Fair=Total fair mins, Diff=vs most-played</p>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px">P=Played, M=Missed, Field=Outfield mins, GK=Goalkeeper mins, Attr=Attributed (absence credit), Fair=Total fair mins</p>
     <div id="seasonStatsList"></div>
     <div class="btn-row" style="margin-top:14px">
-      <button class="btn btn-primary btn-sm" style="flex:1" onclick="saveSeasonStats()">Save This Match</button>
+      <button class="btn btn-primary btn-sm" style="flex:1" onclick="saveSeasonStats()">Save Match</button>
       <button class="btn btn-secondary btn-sm" style="flex:1" onclick="exportSeasonJSON()">Export JSON</button>
     </div>
     <div class="btn-row">
@@ -338,10 +373,7 @@ select option{background:#252b33;}
     </div>
     <button class="btn btn-secondary btn-sm" onclick="exportMatchCSV()" style="width:100%;margin-bottom:8px">Export Match CSV</button>
 
-```
-<button class="btn btn-danger btn-sm" onclick="clearSeasonStats()" style="width:100%">Reset Season</button>
-```
-
+    <button class="btn btn-danger btn-sm" id="btnClearSeason" onclick="clearSeasonStats()" style="width:100%">Reset Season</button>
   </div>
 </div>
 
@@ -449,7 +481,7 @@ function collectPlayers(){const c=gn('squadCount');const p=[];for(let i=0;i<c;i+
 /* SEASON DATA */
 function loadSeason(){return JSON.parse(localStorage.getItem('cpe_season2')||'{}');}
 function saveSeason(d){localStorage.setItem('cpe_season2',JSON.stringify(d));}
-function getPlayerRecord(s,n){return s[n]||{matches:0,missedMatches:0,actualMins:0,attributedMins:0,goals:0,assists:0};}
+function getPlayerRecord(s,n){return s[n]||{matches:0,missedMatches:0,actualMins:0,attributedMins:0,gkMins:0,goals:0,assists:0};}
 function seasonFairMins(r){return r.actualMins+(r.attributedMins||0);}
 function attachSeasonDebt(players){const s=loadSeason();const recs=players.map(p=>getPlayerRecord(s,p.name));const maxFair=recs.reduce(function(m,r){return Math.max(m,seasonFairMins(r));},0);players.forEach(function(p,i){p.seasonFairMins=seasonFairMins(recs[i]);p.seasonDebt=maxFair-p.seasonFairMins;});}
 
@@ -895,12 +927,13 @@ function buildSeasonStats(){
   const rows=unique.map(function(name){const r=getPlayerRecord(season,name);const fair=seasonFairMins(r);const cur=curMins[name]||0;return {name:name,r:r,fair:fair,cur:cur};}).sort(function(a,b){return b.fair-a.fair;});
   const maxFair=rows.length?rows[0].fair:0;
   let html='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">';
-  html+='<thead><tr style="color:var(--muted);border-bottom:1px solid var(--border)"><th style="text-align:left;padding:6px 4px">Player</th><th style="text-align:right;padding:6px 4px">P</th><th style="text-align:right;padding:6px 4px;color:#ff8080">M</th><th style="text-align:right;padding:6px 4px">Mins</th><th style="text-align:right;padding:6px 4px">Attr</th><th style="text-align:right;padding:6px 4px">Fair</th><th style="text-align:right;padding:6px 4px">Diff</th><th style="text-align:right;padding:6px 4px">G</th><th style="text-align:right;padding:6px 4px">A</th></tr></thead><tbody>';
+  html+='<thead><tr style="color:var(--muted);border-bottom:1px solid var(--border)"><th style="text-align:left;padding:6px 4px">Player</th><th style="text-align:right;padding:6px 4px">P</th><th style="text-align:right;padding:6px 4px;color:#ff8080">M</th><th style="text-align:right;padding:6px 4px">Field</th><th style="text-align:right;padding:6px 4px;color:var(--amber)">GK</th><th style="text-align:right;padding:6px 4px">Attr</th><th style="text-align:right;padding:6px 4px">Fair</th><th style="text-align:right;padding:6px 4px">Δ</th><th style="text-align:right;padding:6px 4px">G</th><th style="text-align:right;padding:6px 4px">A</th></tr></thead><tbody>';
   rows.forEach(function(row){
     const diff=row.fair-maxFair;
     const diffStr=diff===0?'-':(diff<0?'<span style="color:#ff8080">'+diff+'</span>':'<span style="color:#3ecf6c">+'+diff+'</span>');
     const curStr=row.cur>0?' <span style="color:var(--amber);font-size:10px">(+'+row.cur+')</span>':'';
-    html+='<tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 4px;font-weight:600">'+row.name+curStr+'</td><td style="text-align:right;padding:7px 4px">'+row.r.matches+'</td><td style="text-align:right;padding:7px 4px;color:#ff8080">'+(row.r.missedMatches||0)+'</td><td style="text-align:right;padding:7px 4px">'+row.r.actualMins+'</td><td style="text-align:right;padding:7px 4px;color:#7a8694">'+(row.r.attributedMins||0)+'</td><td style="text-align:right;padding:7px 4px;font-weight:700">'+row.fair+'</td><td style="text-align:right;padding:7px 4px">'+diffStr+'</td><td style="text-align:right;padding:7px 4px;color:#3ecf6c;font-weight:700">'+(row.r.goals||0)+'</td><td style="text-align:right;padding:7px 4px;color:#7a8694">'+(row.r.assists||0)+'</td></tr>';
+    var gkCell=(row.r.gkMins||0)>0?'<span style="color:var(--amber)">'+(row.r.gkMins||0)+'</span>':'<span style="color:var(--muted)">-</span>';
+    html+='<tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 4px;font-weight:600">'+row.name+curStr+'</td><td style="text-align:right;padding:7px 4px">'+row.r.matches+'</td><td style="text-align:right;padding:7px 4px;color:#ff8080">'+(row.r.missedMatches||0)+'</td><td style="text-align:right;padding:7px 4px">'+row.r.actualMins+'</td><td style="text-align:right;padding:7px 4px">'+gkCell+'</td><td style="text-align:right;padding:7px 4px;color:#7a8694">'+(row.r.attributedMins||0)+'</td><td style="text-align:right;padding:7px 4px;font-weight:700">'+row.fair+'</td><td style="text-align:right;padding:7px 4px">'+diffStr+'</td><td style="text-align:right;padding:7px 4px;color:#3ecf6c;font-weight:700">'+(row.r.goals||0)+'</td><td style="text-align:right;padding:7px 4px;color:#7a8694">'+(row.r.assists||0)+'</td></tr>';
   });
   html+='</tbody></table></div>';
   $('seasonStatsList').innerHTML=html;
@@ -929,7 +962,7 @@ function saveSeasonStats(){
   });
   saveSeason(season);showAlert('Match saved to season!','success');buildSeasonStats();
 }
-function clearSeasonStats(){if(confirm('Reset all season stats?')){localStorage.removeItem('cpe_season2');showAlert('Season stats cleared','success');buildSeasonStats();}}
+/* clearSeasonStats defined in history section */
 
 /* EXPORT / IMPORT */
 function downloadFile(filename,content,mime){
@@ -971,8 +1004,8 @@ function exportSeasonJSON(){const data=loadSeason();downloadFile('season_data.js
 function exportSeasonCSV(){
   const season=loadSeason();const keys=Object.keys(season).sort();
   if(!keys.length){showAlert('No season data to export');return;}
-  let csv='Player,Matches Played,Matches Missed,Actual Mins,Attributed Mins,Fair Total,Goals,Assists\n';
-  keys.forEach(function(name){const r=getPlayerRecord(season,name);const fair=seasonFairMins(r);csv+='"'+name+'",'+r.matches+','+(r.missedMatches||0)+','+r.actualMins+','+(r.attributedMins||0)+','+fair+','+(r.goals||0)+','+(r.assists||0)+'\n';});
+  let csv='Player,Matches Played,Matches Missed,Field Mins,GK Mins,Attributed Mins,Fair Total,Goals,Assists\n';
+  keys.forEach(function(name){const r=getPlayerRecord(season,name);const fair=seasonFairMins(r);csv+='"'+name+'",'+r.matches+','+(r.missedMatches||0)+','+r.actualMins+','+(r.gkMins||0)+','+(r.attributedMins||0)+','+fair+','+(r.goals||0)+','+(r.assists||0)+'\n';});
   downloadFile('season_stats.csv',csv,'text/csv');
 }
 function exportMatchCSV(){
@@ -1151,6 +1184,267 @@ function importSquadJSON(file){
   reader.readAsText(file);
 }
 
+
+/* ═══════════════ MATCH HISTORY ═════════════════════════════════════════
+   Each saved match stores:
+   { id, date, opponent, formation, scoreUs, scoreThem,
+     goals:[{min,scorer,assist}],
+     playerMins:{name:mins},
+     lineups:[{subAt, players:[name], gk:name}]  <- for analysis
+   }
+═════════════════════════════════════════════════════════════════════════ */
+function loadHistory(){ return JSON.parse(localStorage.getItem('am_history')||'[]'); }
+function saveHistory(h){ localStorage.setItem('am_history',JSON.stringify(h)); }
+
+function saveSeasonStats(){
+  if(!planGenerated){ showAlert('Generate a plan first'); return; }
+  const season = loadSeason();
+  const count  = gn('squadCount');
+  const playedMins = playersData.map(function(p){return p.outfieldMins;}).filter(function(m){return m>0;});
+  const matchAvg   = playedMins.length ? Math.round(playedMins.reduce(function(a,b){return a+b;},0)/playedMins.length) : 0;
+  const matchGoals={}, matchAssists={};
+  goalLog.filter(function(g){return g.team==='home';}).forEach(function(g){
+    if(g.scorer) matchGoals[g.scorer]=(matchGoals[g.scorer]||0)+1;
+    if(g.assist) matchAssists[g.assist]=(matchAssists[g.assist]||0)+1;
+  });
+  // Calculate GK minutes from blocks
+  var gkMinsMap={};
+  blocks.forEach(function(blk){
+    var gkName=blk.activeGK.name;
+    gkMinsMap[gkName]=(gkMinsMap[gkName]||0)+blk.dur;
+  });
+
+  playersData.forEach(function(p){
+    const r=getPlayerRecord(season,p.name);
+    r.matches++; r.actualMins+=p.outfieldMins;
+    r.gkMins=(r.gkMins||0)+(gkMinsMap[p.name]||0);
+    r.goals=(r.goals||0)+(matchGoals[p.name]||0);
+    r.assists=(r.assists||0)+(matchAssists[p.name]||0);
+    season[p.name]=r;
+  });
+  const savedSquad=activeSquad();
+  savedSquad.forEach(function(sp){
+    if(!sp.name) return;
+    const played=playersData.some(function(p){return p.name===sp.name;});
+    if(!played){
+      const r=getPlayerRecord(season,sp.name);
+      r.missedMatches=(r.missedMatches||0)+1;
+      r.attributedMins=(r.attributedMins||0)+matchAvg;
+      season[sp.name]=r;
+    }
+  });
+  saveSeason(season);
+
+  // Save to match history
+  const history = loadHistory();
+  const opponent = gv('opponentName')||'Unknown';
+  const playerMins = {};
+  playersData.forEach(function(p){ playerMins[p.name]=p.outfieldMins; });
+  const lineups = blocks.map(function(blk){
+    return {
+      subAt: blk.subAt,
+      gk: blk.activeGK.name,
+      players: blk.lineup.map(function(p){return p.name;})
+    };
+  });
+  history.push({
+    id: Date.now(),
+    date: new Date().toISOString().slice(0,10),
+    opponent: opponent,
+    formation: currentFormation,
+    scoreUs: scoreHome,
+    scoreThem: scoreAway,
+    goals: goalLog.filter(function(g){return g.team==='home';}),
+    conceded: scoreAway,
+    playerMins: playerMins,
+    lineups: lineups
+  });
+  saveHistory(history);
+  showAlert('Match saved!','success');
+  buildSeasonStats();
+}
+
+function clearSeasonStats(){
+  // window.confirm is blocked in iOS PWA standalone mode — use inline confirmation
+  var btn=$('btnClearSeason');
+  if(btn&&btn.dataset.confirm!=='yes'){
+    btn.dataset.confirm='yes';
+    btn.textContent='Tap again to confirm';
+    btn.style.background='#ff4444';
+    setTimeout(function(){
+      btn.dataset.confirm='';
+      btn.textContent='Reset Season';
+      btn.style.background='';
+    },3000);
+    return;
+  }
+  if(btn){btn.dataset.confirm='';btn.textContent='Reset Season';btn.style.background='';}
+  localStorage.removeItem('cpe_season2');
+  localStorage.removeItem('am_history');
+  showAlert('Season and match history cleared','success');
+  buildSeasonStats();
+}
+
+function buildHistoryScreen(){
+  const history=loadHistory();
+  buildHistoryOverview(history);
+  buildHistoryAnalysis(history);
+  buildHistoryList(history);
+}
+
+function buildHistoryOverview(history){
+  const el=$('histOverview');
+  if(!el) return;
+  if(!history.length){ el.innerHTML='<p style="color:var(--muted);font-size:13px;grid-column:1/-1">No matches saved yet.</p>'; return; }
+  const played=history.length;
+  const wins=history.filter(function(m){return m.scoreUs>m.scoreThem;}).length;
+  const draws=history.filter(function(m){return m.scoreUs===m.scoreThem;}).length;
+  const losses=played-wins-draws;
+  const gf=history.reduce(function(s,m){return s+m.scoreUs;},0);
+  const ga=history.reduce(function(s,m){return s+m.scoreThem;},0);
+  el.innerHTML=
+    '<div class="stat-box"><div class="stat-box-val">'+played+'</div><div class="stat-box-lbl">Played</div></div>'+
+    '<div class="stat-box"><div class="stat-box-val" style="color:var(--green)">'+wins+'</div><div class="stat-box-lbl">Won</div></div>'+
+    '<div class="stat-box"><div class="stat-box-val" style="color:var(--amber)">'+draws+'</div><div class="stat-box-lbl">Drawn</div></div>'+
+    '<div class="stat-box"><div class="stat-box-val" style="color:var(--red)">'+losses+'</div><div class="stat-box-lbl">Lost</div></div>'+
+    '<div class="stat-box"><div class="stat-box-val">'+gf+'</div><div class="stat-box-lbl">Goals For</div></div>'+
+    '<div class="stat-box"><div class="stat-box-val">'+ga+'</div><div class="stat-box-lbl">Goals Against</div></div>'+
+    '<div class="stat-box"><div class="stat-box-val">'+(gf-ga>0?'+':'')+(gf-ga)+'</div><div class="stat-box-lbl">Goal Diff</div></div>'+
+    '<div class="stat-box"><div class="stat-box-val">'+(played?Math.round((wins/played)*100)+'%':'—')+'</div><div class="stat-box-lbl">Win Rate</div></div>';
+}
+
+function buildHistoryAnalysis(history){
+  const el=$('histAnalysis');
+  if(!el) return;
+  if(history.length<2){ el.innerHTML='<p style="color:var(--muted);font-size:13px">Play more matches to unlock analysis.</p>'; return; }
+
+  var html='';
+
+  // ── Formation analysis ──────────────────────────────────────────────
+  var formStats={};
+  history.forEach(function(m){
+    var f=m.formation||'?';
+    if(!formStats[f]) formStats[f]={p:0,w:0,gf:0,ga:0};
+    formStats[f].p++;
+    if(m.scoreUs>m.scoreThem) formStats[f].w++;
+    formStats[f].gf+=m.scoreUs; formStats[f].ga+=m.scoreThem;
+  });
+  html+='<div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">By Formation</div>';
+  Object.keys(formStats).forEach(function(f){
+    var s=formStats[f];
+    var wr=Math.round(s.w/s.p*100);
+    html+='<div class="analysis-row"><span style="font-weight:600">'+f+'</span><span style="color:var(--muted)">'+s.p+' games</span><span style="color:var(--green)">'+wr+'% W</span><span>'+s.gf+'-'+s.ga+'</span></div>';
+  });
+
+  // ── Player on-pitch goal impact ─────────────────────────────────────
+  // For each player: when they play, what is our avg goals scored/conceded?
+  var playerImpact={};
+  history.forEach(function(m){
+    var players=Object.keys(m.playerMins||{});
+    players.forEach(function(name){
+      if(!playerImpact[name]) playerImpact[name]={gfTotal:0,gaTotal:0,matches:0,goals:0,assists:0};
+      playerImpact[name].gfTotal+=m.scoreUs;
+      playerImpact[name].gaTotal+=m.scoreThem;
+      playerImpact[name].matches++;
+    });
+  });
+  // Add goal/assist data from season
+  const season=loadSeason();
+  Object.keys(season).forEach(function(name){
+    if(playerImpact[name]){
+      playerImpact[name].goals=season[name].goals||0;
+      playerImpact[name].assists=season[name].assists||0;
+    }
+  });
+
+  // Sort by avg goals scored when on pitch
+  var impact=Object.keys(playerImpact).filter(function(n){return playerImpact[n].matches>=2;})
+    .map(function(n){
+      var s=playerImpact[n];
+      return {name:n, avgGF:s.gfTotal/s.matches, avgGA:s.gaTotal/s.matches,
+              matches:s.matches, goals:s.goals, assists:s.assists};
+    }).sort(function(a,b){return b.avgGF-a.avgGF;});
+
+  if(impact.length){
+    html+='<div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin:14px 0 8px">When Player is On Pitch (avg/game)</div>';
+    html+='<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Sorted by goals scored</div>';
+    var maxGF=Math.max.apply(null,impact.map(function(p){return p.avgGF;}));
+    impact.forEach(function(p){
+      var barW=maxGF>0?Math.round(p.avgGF/maxGF*100):0;
+      var gd=p.avgGF-p.avgGA;
+      var gdStr=(gd>0?'+':'')+gd.toFixed(1);
+      var gdCol=gd>0?'var(--green)':gd<0?'var(--red)':'var(--muted)';
+      html+='<div class="analysis-row">'
+        +'<span style="font-weight:600;width:70px;flex-shrink:0">'+p.name+'</span>'
+        +'<div class="analysis-bar-wrap"><div class="analysis-bar" style="width:'+barW+'%;background:var(--amber)"></div></div>'
+        +'<span style="color:var(--green);width:32px;text-align:right">'+p.avgGF.toFixed(1)+'</span>'
+        +'<span style="color:var(--red);width:32px;text-align:right">'+p.avgGA.toFixed(1)+'</span>'
+        +'<span style="color:'+gdCol+';width:36px;text-align:right">'+gdStr+'</span>'
+        +'</div>';
+    });
+    html+='<div style="font-size:11px;color:var(--muted);margin-top:4px">Green=avg scored · Red=avg conceded · Diff=goal difference</div>';
+  }
+
+  // ── Top scorers ────────────────────────────────────────────────────
+  var scorers=impact.filter(function(p){return p.goals>0;}).sort(function(a,b){return b.goals-a.goals;}).slice(0,5);
+  if(scorers.length){
+    html+='<div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin:14px 0 8px">Top Scorers</div>';
+    scorers.forEach(function(p){
+      html+='<div class="analysis-row"><span style="font-weight:600">'+p.name+'</span><span style="color:var(--amber);font-weight:700;font-size:16px">'+p.goals+' goal'+(p.goals!==1?'s':'')+'</span><span style="color:var(--muted)">'+p.assists+' assist'+(p.assists!==1?'s':'')+'</span></div>';
+    });
+  }
+
+  el.innerHTML=html||'<p style="color:var(--muted);font-size:13px">Not enough data yet.</p>';
+}
+
+function buildHistoryList(history){
+  const el=$('histMatches');
+  if(!el) return;
+  if(!history.length){ el.innerHTML=''; return; }
+  var html='<div class="card-title" style="font-weight:700;font-size:18px;color:var(--amber);margin-bottom:10px">Match Log</div>';
+  history.slice().reverse().forEach(function(m){
+    var resultClass=m.scoreUs>m.scoreThem?'win':m.scoreUs<m.scoreThem?'loss':'draw';
+    var dateStr=m.date?new Date(m.date+'T12:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'}):'';
+    var goalDetail='';
+    if(m.goals&&m.goals.length){
+      goalDetail='<div class="hist-detail">'+m.goals.map(function(g){return g.min+"'&nbsp;"+g.scorer+(g.assist?" ("+g.assist+")":"");}).join(' &nbsp;·&nbsp; ')+'</div>';
+    }
+    html+='<div class="hist-card">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center">'
+      +'<div><div class="hist-result '+resultClass+'">'+m.scoreUs+' – '+m.scoreThem+'</div>'
+      +'<div class="hist-meta">vs '+m.opponent+'&nbsp;&nbsp;'+dateStr+'&nbsp;&nbsp;'+m.formation+'</div></div>'
+      +'<div style="text-align:right;font-size:12px;color:var(--muted)">'+m.scoreUs+'-'+m.scoreThem+'<br><span style="font-size:10px">'+(m.scoreUs>m.scoreThem?'WIN':m.scoreUs<m.scoreThem?'LOSS':'DRAW')+'</span></div>'
+      +'</div>'+goalDetail+'</div>';
+  });
+  el.innerHTML=html;
+}
+
+function exportHistoryJSON(){
+  const data=loadHistory();
+  downloadFile('match_history.json',JSON.stringify(data,null,2),'application/json');
+}
+function importHistory(file){
+  if(!file) return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      var data=JSON.parse(e.target.result);
+      if(!Array.isArray(data)) throw new Error('Invalid');
+      saveHistory(data);
+      showAlert('History imported!','success');
+      buildHistoryScreen();
+    }catch(err){showAlert('Import failed');}
+  };
+  reader.readAsText(file);
+}
+function clearHistory(){
+  if(confirm('Delete all match history?')){
+    localStorage.removeItem('am_history');
+    showAlert('History cleared','success');
+    buildHistoryScreen();
+  }
+}
+
 /* INIT */
 (function init(){
   buildFormationGrid();
@@ -1159,6 +1453,5 @@ function importSquadJSON(file){
   if(saved.length){$('squadCount').value=saved.length;buildPlayerInputs();}
 }());
 </script>
-
 </body>
 </html>
