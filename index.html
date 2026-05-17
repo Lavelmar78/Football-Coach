@@ -177,7 +177,7 @@ select option{background:#252b33;}
   <div class="card">
     <div class="card-title">Match Settings</div>
     <div class="row2">
-      <div><label class="field-label">Match Length (mins)</label><input id="matchLength" type="number" value="52" min="10" max="120"></div>
+      <div><label class="field-label">Match Length (mins)</label><input id="matchLength" type="number" value="50" min="10" max="120"></div>
       <div><label class="field-label">Squad Size</label><input id="squadCount" type="number" value="11" min="7" max="20"></div>
     </div>
     <label class="field-label">Opponent</label>
@@ -402,7 +402,7 @@ select option{background:#252b33;}
 /* STATE */
 let playersData=[], blocks=[], currentBlockIdx=0, timerInterval=null;
 let elapsedSeconds=0, matchStartWallTime=null, matchStartElapsed=0;
-let matchLengthMins=52, planGenerated=false, planSummary=null;
+let matchLengthMins=50, planGenerated=false, planSummary=null;
 let scoreHome=0, scoreAway=0, goalLog=[];
 let activeSquadIdx=0, currentFormation='2-3-1';
 
