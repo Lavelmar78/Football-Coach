@@ -184,6 +184,15 @@ select option{background:#252b33;}
     <input type="text" id="opponentName" placeholder="e.g. Rovers FC">
     <label class="toggle-row" for="gkMode"><input type="checkbox" id="gkMode" checked><span class="toggle-pill"></span><span class="toggle-label">GKs: full half goal + full half outfield</span></label>
     <label class="toggle-row" for="alertMode"><input type="checkbox" id="alertMode" checked><span class="toggle-pill"></span><span class="toggle-label">Vibrate &amp; beep 1 min before subs</span></label>
+    <div style="margin-bottom:14px">
+      <label class="field-label">Max Sub Windows Per Half</label>
+      <select id="maxSubWindows">
+        <option value="1">1 — Halftime only (simplest)</option>
+        <option value="2" selected>2 — Halftime + 1 mid-half break</option>
+        <option value="3">3 — Halftime + 2 mid-half breaks</option>
+        <option value="4">4 — Maximum rotation</option>
+      </select>
+    </div>
     <div id="alertBox" class="alert"></div>
     <div style="margin-bottom:10px">
       <label class="field-label">Formation</label>
@@ -377,6 +386,26 @@ select option{background:#252b33;}
   </div>
 </div>
 
+<div class="modal-overlay" id="modal-edit-match" onclick="closeModal(event,'modal-edit-match')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal(null,'modal-edit-match')">x</button>
+    <div class="modal-title">Edit Match</div>
+    <input type="hidden" id="editMatchId">
+    <label class="field-label">Opponent</label>
+    <input type="text" id="editOpponent" placeholder="e.g. Rovers FC">
+    <label class="field-label">Date</label>
+    <input type="date" id="editDate">
+    <label class="field-label">Score (Us)</label>
+    <input type="number" id="editScoreUs" min="0" max="99">
+    <label class="field-label">Score (Them)</label>
+    <input type="number" id="editScoreThem" min="0" max="99">
+    <div class="btn-row">
+      <button class="btn btn-primary" style="flex:1" onclick="saveMatchEdit()">Save</button>
+      <button class="btn btn-danger btn-sm" id="btnDeleteMatch" style="flex:1;margin-bottom:0" onclick="deleteMatchFromHistory()">Delete Match</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-report" onclick="closeModal(event,'modal-report')">
   <div class="modal" onclick="event.stopPropagation()">
     <button class="modal-close" onclick="closeModal(null,'modal-report')">x</button>
@@ -399,6 +428,8 @@ select option{background:#252b33;}
 </div>
 
 <script>
+
+
 /* STATE */
 let playersData=[], blocks=[], currentBlockIdx=0, timerInterval=null;
 let elapsedSeconds=0, matchStartWallTime=null, matchStartElapsed=0;
@@ -420,8 +451,11 @@ const gc=function(id){var el=$(id);return !!(el&&el.checked);};
 function showAlert(msg,type='error'){const el=$('alertBox');el.textContent=msg;el.className='alert '+type;clearTimeout(el._t);el._t=setTimeout(()=>{el.className='alert';},5000);}
 function shuffle(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 function showTab(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.tabbar-btn').forEach(b=>b.classList.remove('active'));$(id).classList.add('active');const t=$('tab-'+id.replace('screen-',''));if(t)t.classList.add('active');}
-function openModal(id){if(id==='modal-injury')buildInjuryList();if(id==='modal-stats')buildSeasonStats();if(id==='modal-report'){var rpt=buildMatchReport();if($('reportBox'))$('reportBox').textContent=rpt;}$(id).classList.add('open');}
-function closeModal(e,id){if(!e||e.target===$(id)){$(id).classList.remove('open');}}
+function openModal(id){if(id==='modal-injury')buildInjuryList();if(id==='modal-stats')buildSeasonStats();if(id==='modal-report'){var box=$('reportBox');if(box&&!box.dataset.historyReport){var rpt=buildMatchReport();if(box)box.textContent=rpt;}}$(id).classList.add('open');}
+function closeModal(e,id){
+  if(!e||e.target===$(id)){
+    if(id==='modal-report'){var box=$('reportBox');if(box)box.dataset.historyReport='';}
+    $(id).classList.remove('open');}}
 
 /* FORMATIONS */
 function buildFormationGrid(){var s=$('formationSelect');if(s)s.value=currentFormation;}
@@ -509,8 +543,9 @@ function generatePlan(){
 
   function buildSegs(sph){const segs=[];let cur=0;for(let h=0;h<2;h++){let rem=half;for(let s=0;s<sph;s++){const dur=Math.round(rem/(sph-s));segs.push({subAt:cur,dur:dur,end:cur+dur});cur+=dur;rem-=dur;}}return segs;}
   function simSpread(segs){const N=allNonGK.length,acc=new Array(N).fill(0);for(let si=0;si<segs.length;si++){const order=[];for(let j=0;j<N;j++)order.push(j);order.sort(function(a,b){return acc[a]-acc[b];});for(let k=0;k<Math.min(poolSlots,N);k++)acc[order[k]]+=segs[si].dur;}return N?Math.max.apply(null,acc)-Math.min.apply(null,acc):0;}
+  const maxSph=Math.max(1,Math.min(4,gn('maxSubWindows')||2));
   let sph=1,bestSp=Infinity,segsPerHalf=1;
-  for(;sph<=4;sph++){const sp=simSpread(buildSegs(sph));if(sp<bestSp){bestSp=sp;segsPerHalf=sph;}if(sp<=1)break;}
+  for(;sph<=maxSph;sph++){const sp=simSpread(buildSegs(sph));if(sp<bestSp){bestSp=sp;segsPerHalf=sph;}if(sp<=1)break;}
   const segments=buildSegs(segsPerHalf);
 
   function assignGKSegs(halfSegs,target){if(target<=0)return{};const sorted=halfSegs.slice().sort(function(a,b){return a.dur-b.dur;});const ids={};let rem=target;for(let i=0;i<sorted.length;i++){if(rem<=0)break;ids[sorted[i].subAt]=true;rem-=sorted[i].dur;}return ids;}
@@ -1409,11 +1444,15 @@ function buildHistoryList(history){
     if(m.goals&&m.goals.length){
       goalDetail='<div class="hist-detail">'+m.goals.map(function(g){return g.min+"'&nbsp;"+g.scorer+(g.assist?" ("+g.assist+")":"");}).join(' &nbsp;·&nbsp; ')+'</div>';
     }
+    var idx=history.length-1-history.slice().reverse().indexOf(m);
     html+='<div class="hist-card">'
       +'<div style="display:flex;justify-content:space-between;align-items:center">'
       +'<div><div class="hist-result '+resultClass+'">'+m.scoreUs+' – '+m.scoreThem+'</div>'
       +'<div class="hist-meta">vs '+m.opponent+'&nbsp;&nbsp;'+dateStr+'&nbsp;&nbsp;'+m.formation+'</div></div>'
-      +'<div style="text-align:right;font-size:12px;color:var(--muted)">'+m.scoreUs+'-'+m.scoreThem+'<br><span style="font-size:10px">'+(m.scoreUs>m.scoreThem?'WIN':m.scoreUs<m.scoreThem?'LOSS':'DRAW')+'</span></div>'
+      +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">'
+      +'<span style="font-size:11px;font-weight:700;color:'+(m.scoreUs>m.scoreThem?'var(--green)':m.scoreUs<m.scoreThem?'var(--red)':'var(--amber)')+';">'+(m.scoreUs>m.scoreThem?'WIN':m.scoreUs<m.scoreThem?'LOSS':'DRAW')+'</span>'
+      +'<div style="display:flex;gap:6px">'+'<button class="btn btn-secondary btn-sm" style="font-size:11px;padding:5px 10px" onclick="showHistoryReport('+m.id+')">Report</button>'+'<button class="btn btn-secondary btn-sm" style="font-size:11px;padding:5px 10px" onclick="openEditMatch('+m.id+')">Edit</button>'+'</div>'
+      +'</div>'
       +'</div>'+goalDetail+'</div>';
   });
   el.innerHTML=html;
@@ -1445,6 +1484,113 @@ function clearHistory(){
   }
 }
 
+
+function showHistoryReport(matchId){
+  var history=loadHistory();
+  var m=history.find(function(h){return h.id===matchId;});
+  if(!m){showAlert('Match not found');return;}
+  var txt=buildHistoryMatchReport(m);
+  var box=$('reportBox');
+  if(box){
+    box.dataset.historyReport='1';
+    box.textContent=txt;
+  }
+  openModal('modal-report');
+}
+
+function buildHistoryMatchReport(m){
+  var tn=gv('teamName')||'Us';
+  var formation=m.formation||'2-3-1';
+  var roles=FORMATION6[formation]||['def','def','midc','midw','att','att'];
+  var rl={'def':'DEF','midc':'MID-C','midw':'MID-W','att':'ATT'};
+  var half=(m.matchMins||50)/2;
+  var date=m.date?new Date(m.date+'T12:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):'';
+  var r='--- MATCH REPORT ---\n';
+  r+=tn+' vs '+m.opponent+' | '+date+'\n';
+  r+='Formation: '+formation+'\n';
+  r+='RESULT: '+tn+' '+m.scoreUs+' - '+m.scoreThem+'\n';
+  if(m.goals&&m.goals.length){
+    m.goals.forEach(function(g){r+='  '+g.min+"': "+g.scorer+(g.assist?' (A: '+g.assist+')':'')+'\n';});
+  }
+  if(m.lineups&&m.lineups.length){
+    r+='\nROTATION PLAN\n';
+    var squadData={};
+    loadAllSquads().forEach(function(sq){sq.forEach(function(p){if(p.name)squadData[p.name]={def:p.def||false,midc:p.midc||false,midw:p.midw||false,att:p.att||false};});});
+    var getPos=function(n){return squadData[n]||{def:false,midc:false,midw:false,att:false};};
+    var assignPos=function(players,gk){
+      var of=players.filter(function(n){return n!==gk;}),placed=new Array(roles.length).fill(null),rem=of.slice();
+      var ord=roles.map(function(r,ri){return {ri:ri,role:r,count:rem.filter(function(n){return getPos(n)[r];}).length};}).sort(function(a,b){return a.count!==b.count?a.count-b.count:a.ri-b.ri;});
+      ord.forEach(function(s){if(placed[s.ri])return;var el=rem.filter(function(n){return getPos(n)[s.role];});if(!el.length)return;el.sort(function(a,b){return Object.values(getPos(a)).filter(Boolean).length-Object.values(getPos(b)).filter(Boolean).length;});placed[s.ri]=el[0];rem.splice(rem.indexOf(el[0]),1);});
+      for(var ri=0;ri<roles.length;ri++){if(!placed[ri]&&rem.length)placed[ri]=rem.shift();}
+      var map={};placed.forEach(function(n,ri){if(n)map[n]=rl[roles[ri]]||roles[ri];});map[gk]='GK';return map;
+    };
+    var prevP=null,prevM={};
+    m.lineups.forEach(function(blk,i){
+      var isKick=i===0,isHalf=!isKick&&Math.abs(blk.subAt-half)<0.5;
+      var pm=assignPos(blk.players,blk.gk);
+      r+=(isKick?'Kickoff':(isHalf?'HT ':'')+blk.subAt+"'")+': '+blk.players.map(function(n){return n+'['+(pm[n]||'?')+']';}).join(', ')+'\n';
+      if(!isKick&&prevP){
+        var off=prevP.filter(function(n){return !blk.players.includes(n);});
+        var on=blk.players.filter(function(n){return !prevP.includes(n);});
+        var onR=on.slice();
+        off.forEach(function(outN){var outRole=prevM[outN]||'?';var match=onR.find(function(n){return pm[n]===outRole;})||onR[0];if(match){onR.splice(onR.indexOf(match),1);r+='  OUT '+outN+'['+outRole+'] IN '+match+'['+(pm[match]||'?')+']\n';}});
+      }
+      prevP=blk.players;prevM=pm;
+    });
+  }
+  r+='\nPLAYING TIME\n';
+  if(m.playerMins){Object.keys(m.playerMins).sort(function(a,b){return m.playerMins[b]-m.playerMins[a];}).forEach(function(n){r+='  '+n+': '+m.playerMins[n]+"'\n";});}
+  return r;
+}
+
+
+function openEditMatch(matchId){
+  var history=loadHistory();
+  var m=history.find(function(h){return h.id===matchId;});
+  if(!m){showAlert('Match not found');return;}
+  $('editMatchId').value=matchId;
+  $('editOpponent').value=m.opponent||'';
+  $('editDate').value=m.date||'';
+  $('editScoreUs').value=m.scoreUs||0;
+  $('editScoreThem').value=m.scoreThem||0;
+  $('modal-edit-match').classList.add('open');
+}
+
+function saveMatchEdit(){
+  var matchId=parseInt($('editMatchId').value);
+  var history=loadHistory();
+  var idx=history.findIndex(function(h){return h.id===matchId;});
+  if(idx===-1){showAlert('Match not found');return;}
+  history[idx].opponent=$('editOpponent').value||history[idx].opponent;
+  history[idx].date=$('editDate').value||history[idx].date;
+  history[idx].scoreUs=parseInt($('editScoreUs').value)||0;
+  history[idx].scoreThem=parseInt($('editScoreThem').value)||0;
+  saveHistory(history);
+  closeModal(null,'modal-edit-match');
+  buildHistoryScreen();
+  showAlert('Match updated','success');
+}
+
+function deleteMatchFromHistory(){
+  var matchId=parseInt($('editMatchId').value);
+  var btn=$('btnDeleteMatch');
+  if(btn&&btn.dataset.confirm!=='yes'){
+    btn.dataset.confirm='yes';
+    btn.textContent='Tap again to confirm';
+    btn.style.background='#ff0000';
+    setTimeout(function(){if(btn){btn.dataset.confirm='';btn.textContent='Delete Match';btn.style.background='';}},3000);
+    return;
+  }
+  var history=loadHistory();
+  var idx=history.findIndex(function(h){return h.id===matchId;});
+  if(idx===-1)return;
+  history.splice(idx,1);
+  saveHistory(history);
+  closeModal(null,'modal-edit-match');
+  buildHistoryScreen();
+  showAlert('Match deleted','success');
+}
+
 /* INIT */
 (function init(){
   buildFormationGrid();
@@ -1452,6 +1598,8 @@ function clearHistory(){
   const saved=activeSquad();
   if(saved.length){$('squadCount').value=saved.length;buildPlayerInputs();}
 }());
+
+
 </script>
 </body>
 </html>
