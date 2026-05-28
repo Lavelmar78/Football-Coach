@@ -266,8 +266,8 @@ select option{background:#252b33;}
       <div class="score-team-name">Them</div>
       <div class="score-goals" id="scoreAway">0</div>
       <div class="score-btns">
-        <button class="s-btn s-btn-plus" onclick="goal('away',1)">+</button>
-        <button class="s-btn s-btn-minus" onclick="goal('away',-1)">-</button>
+        <button class="s-btn s-btn-plus" onclick="openOppGoalModal()">+</button>
+        <button class="s-btn s-btn-minus" onclick="removeLastGoal('away')">-</button>
       </div>
     </div>
   </div>
@@ -383,6 +383,16 @@ select option{background:#252b33;}
     <button class="btn btn-secondary btn-sm" onclick="exportMatchCSV()" style="width:100%;margin-bottom:8px">Export Match CSV</button>
 
     <button class="btn btn-danger btn-sm" id="btnClearSeason" onclick="clearSeasonStats()" style="width:100%">Reset Season</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-opp-goal" onclick="closeModal(event,'modal-opp-goal')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal(null,'modal-opp-goal')">x</button>
+    <div class="modal-title">Opponent Goal</div>
+    <label class="field-label">Minute (optional)</label>
+    <input type="number" id="oppGoalMinute" min="1" max="120" placeholder="Match minute">
+    <button class="btn btn-primary" onclick="confirmOppGoal()">Record Goal</button>
   </div>
 </div>
 
@@ -515,9 +525,9 @@ function collectPlayers(){const c=gn('squadCount');const p=[];for(let i=0;i<c;i+
 /* SEASON DATA */
 function loadSeason(){return JSON.parse(localStorage.getItem('cpe_season2')||'{}');}
 function saveSeason(d){localStorage.setItem('cpe_season2',JSON.stringify(d));}
-function getPlayerRecord(s,n){return s[n]||{matches:0,missedMatches:0,actualMins:0,attributedMins:0,gkMins:0,goals:0,assists:0};}
+function getPlayerRecord(s,n){return s[n]||{matches:0,missedMatches:0,actualMins:0,attributedMins:0,gkMins:0,goals:0,assists:0,lastStartedSub:false};}
 function seasonFairMins(r){return r.actualMins+(r.attributedMins||0);}
-function attachSeasonDebt(players){const s=loadSeason();const recs=players.map(p=>getPlayerRecord(s,p.name));const maxFair=recs.reduce(function(m,r){return Math.max(m,seasonFairMins(r));},0);players.forEach(function(p,i){p.seasonFairMins=seasonFairMins(recs[i]);p.seasonDebt=maxFair-p.seasonFairMins;});}
+function attachSeasonDebt(players){const s=loadSeason();const recs=players.map(p=>getPlayerRecord(s,p.name));const maxFair=recs.reduce(function(m,r){return Math.max(m,seasonFairMins(r));},0);players.forEach(function(p,i){p.seasonFairMins=seasonFairMins(recs[i]);p.seasonDebt=maxFair-p.seasonFairMins;p.lastStartedSub=!!(recs[i].lastStartedSub);});}
 
 /* PLAN GENERATION */
 function onGeneratePlan(){const e=generatePlan();if(!e)showTab('screen-plan');}
@@ -583,12 +593,12 @@ function generatePlan(){
 
     // Phase 1: pick lowest-time players.
     // Sort by combined total: this-match outfield mins + season fair mins.
-    // This naturally rotates who gets the "extra" segment each match —
-    // players who got more time last match have a higher combined score
-    // and yield priority to those who got less, equalising over the season.
+    // Players who started on the bench last match get a half-segment boost
+    // so they are prioritised into the starting lineup this match.
+    const subBoost=seg.dur*0.5;
     const poolSorted=poolAvail.slice().sort(function(a,b){
-      const sa=a.outfieldMins+(a.seasonFairMins||0);
-      const sb=b.outfieldMins+(b.seasonFairMins||0);
+      const sa=(a.outfieldMins+(a.seasonFairMins||0))-(a.lastStartedSub?subBoost:0);
+      const sb=(b.outfieldMins+(b.seasonFairMins||0))-(b.lastStartedSub?subBoost:0);
       return sa-sb;
     });
     const chosen=poolSorted.slice(0,roles.length);
@@ -906,7 +916,7 @@ function updateScoreDisplay(){
   renderGoalLog();
 }
 function goal(team,delta){if(team==='home')scoreHome=Math.max(0,scoreHome+delta);else scoreAway=Math.max(0,scoreAway+delta);updateScoreDisplay();}
-function removeLastGoal(){const idx=goalLog.map(function(g){return g.team;}).lastIndexOf('home');if(idx!==-1)goalLog.splice(idx,1);scoreHome=Math.max(0,scoreHome-1);updateScoreDisplay();}
+function removeLastGoal(team){var t=team||'home';var idx=-1;for(var i=goalLog.length-1;i>=0;i--){if(goalLog[i].team===t){idx=i;break;}}if(idx!==-1)goalLog.splice(idx,1);if(t==='home')scoreHome=Math.max(0,scoreHome-1);else scoreAway=Math.max(0,scoreAway-1);updateScoreDisplay();}
 function openGoalModal(){
   $('goalMinute').value=Math.floor(elapsedSeconds/60)||'';
   const lineup=(planGenerated&&blocks[currentBlockIdx]&&blocks[currentBlockIdx].lineup)||playersData;
@@ -924,14 +934,18 @@ function confirmGoal(){
   scoreHome++;updateScoreDisplay();closeModal(null,'modal-goal');
 }
 function renderGoalLog(){
-  const homeGoals=goalLog.filter(function(g){return g.team==='home';});
-  if(!homeGoals.length){$('goalLogWrap').style.display='none';return;}
+  var allGoals=goalLog.filter(function(g){return g.team==='home'||g.team==='away';});
+  if(!allGoals.length){$('goalLogWrap').style.display='none';return;}
   $('goalLogWrap').style.display='';
-  const cnt=$('goalLogCount');if(cnt)cnt.textContent=homeGoals.length+' goal'+(homeGoals.length!==1?'s':'');
-  $('goalLog').innerHTML=homeGoals.map(function(g){
+  var homeCount=goalLog.filter(function(g){return g.team==='home';}).length;
+  const cnt=$('goalLogCount');if(cnt)cnt.textContent=homeCount+' goal'+(homeCount!==1?'s':'');
+  $('goalLog').innerHTML=allGoals.map(function(g){
     const gi=goalLog.indexOf(g);
-    const assistPart=g.assist?'<span class="goal-assist"> Assist: '+g.assist+'</span>':'';
-    return '<div class="goal-entry"><span class="goal-min">'+g.min+'\'</span><div style="flex:1"><span class="goal-scorer">'+g.scorer+'</span>'+assistPart+'</div><button class="goal-del" onclick="deleteGoal('+gi+')">x</button></div>';
+    var isHome=g.team==='home';
+    var assistPart=g.assist?'<span class="goal-assist"> Assist: '+g.assist+'</span>':'';
+    var scorerPart=isHome?(g.scorer||'?'):'<span style="color:var(--red)">Opponent</span>';
+    var minStyle=isHome?'color:var(--amber)':'color:var(--red)';
+    return '<div class="goal-entry"><span class="goal-min" style="'+minStyle+'">'+g.min+'\'</span><div style="flex:1"><span class="goal-scorer">'+scorerPart+'</span>'+assistPart+'</div><button class="goal-del" onclick="deleteGoal('+gi+')">x</button></div>';
   }).join('');
 }
 function deleteGoal(idx){const g=goalLog[idx];if(!g)return;goalLog.splice(idx,1);if(g.team==='home')scoreHome=Math.max(0,scoreHome-1);else scoreAway=Math.max(0,scoreAway-1);updateScoreDisplay();}
@@ -1082,9 +1096,11 @@ function buildMatchReport(){
   r+='Formation: '+currentFormation+' | '+matchLengthMins+' mins\n';
   if(scoreHome||scoreAway){
     r+='RESULT: '+tn+' '+scoreHome+' - '+scoreAway+'\n';
-    var hg=goalLog.filter(function(g){return g.team==='home';});
-    hg.forEach(function(g){r+='  '+g.min+"'"+'\': '+g.scorer+(g.assist?' (A: '+g.assist+')':'')+'\n';});
+    var allG=goalLog.slice().sort(function(a,b){return a.min-b.min;});
+    allG.forEach(function(g){if(g.team==='home')r+='  '+g.min+"'"+'\': ['+tn+'] '+g.scorer+(g.assist?' (A: '+g.assist+')':'')+'\n';else r+='  '+g.min+"'"+'\': [Opp]\n';});
   }
+  var gk1n=gv('gk1'),gk2n=gv('gk2');
+  if(gk1n||gk2n){r+='GK: 1st half='+(gk1n||'?')+', 2nd half='+(gk2n||'?')+'\n';}
   r+='\nROTATION PLAN\n';
   blocks.forEach(function(blk,i){
     var isKick=i===0,isHalf=!isKick&&Math.abs(blk.subAt-half)<0.5;
@@ -1249,12 +1265,27 @@ function saveSeasonStats(){
     gkMinsMap[gkName]=(gkMinsMap[gkName]||0)+blk.dur;
   });
 
+  // Track who started on the bench (not in block 0) for next match's rotation boost
+  var block0names=new Set(blocks.length?blocks[0].lineup.map(function(p){return p.name;}):[]);
+
+  // GK fair-minutes top-up:
+  // If a player served as GK for a half, their outfield time is structurally
+  // limited (~half the match). Credit them matchAvg in attributedMins so their
+  // seasonFairMins stays in line with pure outfield players.
+  var gkFull=gc('gkMode');
+  var gkPlayers=new Set(Object.keys(gkMinsMap));
   playersData.forEach(function(p){
     const r=getPlayerRecord(season,p.name);
     r.matches++; r.actualMins+=p.outfieldMins;
     r.gkMins=(r.gkMins||0)+(gkMinsMap[p.name]||0);
     r.goals=(r.goals||0)+(matchGoals[p.name]||0);
     r.assists=(r.assists||0)+(matchAssists[p.name]||0);
+    // If player was a GK this match (gkFull mode), top up their fair mins
+    if(gkFull&&gkPlayers.has(p.name)){
+      r.attributedMins=(r.attributedMins||0)+matchAvg;
+    }
+    // Record whether this player started on the bench (for next match boost)
+    r.lastStartedSub=!block0names.has(p.name);
     season[p.name]=r;
   });
   const savedSquad=activeSquad();
@@ -1290,6 +1321,9 @@ function saveSeasonStats(){
     scoreUs: scoreHome,
     scoreThem: scoreAway,
     goals: goalLog.filter(function(g){return g.team==='home';}),
+    oppGoals: goalLog.filter(function(g){return g.team==='away';}),
+    gkFirst: gv('gk1')||null,
+    gkSecond: gv('gk2')||null,
     conceded: scoreAway,
     playerMins: playerMins,
     lineups: lineups
@@ -1509,9 +1543,12 @@ function buildHistoryMatchReport(m){
   r+=tn+' vs '+m.opponent+' | '+date+'\n';
   r+='Formation: '+formation+'\n';
   r+='RESULT: '+tn+' '+m.scoreUs+' - '+m.scoreThem+'\n';
-  if(m.goals&&m.goals.length){
-    m.goals.forEach(function(g){r+='  '+g.min+"': "+g.scorer+(g.assist?' (A: '+g.assist+')':'')+'\n';});
-  }
+  var allMG=[];
+  if(m.goals)m.goals.forEach(function(g){allMG.push({min:g.min,team:'home',scorer:g.scorer,assist:g.assist});});
+  if(m.oppGoals)m.oppGoals.forEach(function(g){allMG.push({min:g.min,team:'away'});});
+  allMG.sort(function(a,b){return a.min-b.min;});
+  allMG.forEach(function(g){if(g.team==='home')r+='  '+g.min+"'"+': ['+tn+'] '+g.scorer+(g.assist?' (A: '+g.assist+')':'')+'\n';else r+='  '+g.min+"'"+': [Opp]\n';});
+  if(m.gkFirst||m.gkSecond){r+='GK: 1st half='+(m.gkFirst||'?')+', 2nd half='+(m.gkSecond||'?')+'\n';}
   if(m.lineups&&m.lineups.length){
     r+='\nROTATION PLAN\n';
     var squadData={};
@@ -1591,6 +1628,8 @@ function deleteMatchFromHistory(){
   showAlert('Match deleted','success');
 }
 
+function openOppGoalModal(){$('oppGoalMinute').value=Math.floor(elapsedSeconds/60)||'';$('modal-opp-goal').classList.add('open');}
+function confirmOppGoal(){var min=parseInt($('oppGoalMinute').value)||Math.floor(elapsedSeconds/60)||1;goalLog.push({min:min,scorer:null,assist:null,team:'away'});goalLog.sort(function(a,b){return a.min-b.min;});scoreAway++;updateScoreDisplay();closeModal(null,'modal-opp-goal');}
 /* INIT */
 (function init(){
   buildFormationGrid();
