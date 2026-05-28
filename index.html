@@ -370,7 +370,7 @@ select option{background:#252b33;}
   <div class="modal" onclick="event.stopPropagation()">
     <button class="modal-close" onclick="closeModal(null,'modal-stats')">x</button>
     <div class="modal-title">Season Stats</div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:12px">P=Played, M=Missed, Field=Outfield mins, GK=Goalkeeper mins, Attr=Attributed (absence credit), Fair=Total fair mins</p>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px">P=Played, M=Missed, Field=Outfield mins, GK=Goalkeeper mins, Attr=Absence credit, Fair=Total fair mins (outfield + absence credit + GK fair credit)</p>
     <div id="seasonStatsList"></div>
     <div class="btn-row" style="margin-top:14px">
       <button class="btn btn-primary btn-sm" style="flex:1" onclick="saveSeasonStats()">Save Match</button>
@@ -525,8 +525,8 @@ function collectPlayers(){const c=gn('squadCount');const p=[];for(let i=0;i<c;i+
 /* SEASON DATA */
 function loadSeason(){return JSON.parse(localStorage.getItem('cpe_season2')||'{}');}
 function saveSeason(d){localStorage.setItem('cpe_season2',JSON.stringify(d));}
-function getPlayerRecord(s,n){return s[n]||{matches:0,missedMatches:0,actualMins:0,attributedMins:0,gkMins:0,goals:0,assists:0,lastStartedSub:false};}
-function seasonFairMins(r){return r.actualMins+(r.attributedMins||0);}
+function getPlayerRecord(s,n){return s[n]||{matches:0,missedMatches:0,actualMins:0,attributedMins:0,gkMins:0,gkFairMins:0,goals:0,assists:0,lastStartedSub:false};}
+function seasonFairMins(r){return r.actualMins+(r.attributedMins||0)+(r.gkFairMins||0);}
 function attachSeasonDebt(players){const s=loadSeason();const recs=players.map(p=>getPlayerRecord(s,p.name));const maxFair=recs.reduce(function(m,r){return Math.max(m,seasonFairMins(r));},0);players.forEach(function(p,i){p.seasonFairMins=seasonFairMins(recs[i]);p.seasonDebt=maxFair-p.seasonFairMins;p.lastStartedSub=!!(recs[i].lastStartedSub);});}
 
 /* PLAN GENERATION */
@@ -1053,8 +1053,8 @@ function exportSeasonJSON(){const data=loadSeason();downloadFile('season_data.js
 function exportSeasonCSV(){
   const season=loadSeason();const keys=Object.keys(season).sort();
   if(!keys.length){showAlert('No season data to export');return;}
-  let csv='Player,Matches Played,Matches Missed,Field Mins,GK Mins,Attributed Mins,Fair Total,Goals,Assists\n';
-  keys.forEach(function(name){const r=getPlayerRecord(season,name);const fair=seasonFairMins(r);csv+='"'+name+'",'+r.matches+','+(r.missedMatches||0)+','+r.actualMins+','+(r.gkMins||0)+','+(r.attributedMins||0)+','+fair+','+(r.goals||0)+','+(r.assists||0)+'\n';});
+  let csv='Player,Matches Played,Matches Missed,Field Mins,GK Mins,Absence Credit,GK Fair Credit,Fair Total,Goals,Assists\n';
+  keys.forEach(function(name){const r=getPlayerRecord(season,name);const fair=seasonFairMins(r);csv+='"'+name+'",'+r.matches+','+(r.missedMatches||0)+','+r.actualMins+','+(r.gkMins||0)+','+(r.attributedMins||0)+','+(r.gkFairMins||0)+','+fair+','+(r.goals||0)+','+(r.assists||0)+'\n';});
   downloadFile('season_stats.csv',csv,'text/csv');
 }
 function exportMatchCSV(){
@@ -1276,13 +1276,20 @@ function saveSeasonStats(){
   var gkPlayers=new Set(Object.keys(gkMinsMap));
   playersData.forEach(function(p){
     const r=getPlayerRecord(season,p.name);
-    r.matches++; r.actualMins+=p.outfieldMins;
+    r.matches++;
     r.gkMins=(r.gkMins||0)+(gkMinsMap[p.name]||0);
     r.goals=(r.goals||0)+(matchGoals[p.name]||0);
     r.assists=(r.assists||0)+(matchAssists[p.name]||0);
-    // If player was a GK this match (gkFull mode), top up their fair mins
     if(gkFull&&gkPlayers.has(p.name)){
-      r.attributedMins=(r.attributedMins||0)+matchAvg;
+      // GK in full mode: their fair contribution = match average outfield mins.
+      // actualMins stores their real outfield time separately (for stats display).
+      // gkFairMins is used in seasonFairMins so rotation treats them equally.
+      // We do NOT add outfield mins to actualMins for GKs — their time in goal
+      // is tracked in gkMins; their outfield time is real but structurally limited.
+      r.actualMins+=p.outfieldMins;  // real outfield played (for display)
+      r.gkFairMins=(r.gkFairMins||0)+matchAvg;  // fair credit = match average
+    } else {
+      r.actualMins+=p.outfieldMins;  // normal outfield player
     }
     // Record whether this player started on the bench (for next match boost)
     r.lastStartedSub=!block0names.has(p.name);
