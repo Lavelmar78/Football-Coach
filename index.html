@@ -711,7 +711,7 @@ async function createTeam(){
     let attempts=0;
     while(existing && attempts<5){ code=generateTeamCode(); existing=await cloudLoadTeamDoc(code); attempts++; }
 
-    const initialDoc={teamName:name,squads:[[]],squad_names:['Squad 1'],season:{},history:[],createdAt:Date.now()};
+    const initialDoc={teamName:name,squads:[{players:[]}],squad_names:['Squad 1'],season:{},history:[],createdAt:Date.now()};
     await cloudSaveTeamDoc(code,initialDoc);
     CURRENT_TEAM_CODE=code;
     localStorage.setItem('am_team_code',code);
@@ -818,8 +818,32 @@ function buildFormationGrid(){var s=$('formationSelect');if(s)s.value=currentFor
 function selectFormation(f){currentFormation=f;buildFormationGrid();}
 
 /* SQUAD MANAGEMENT */
-async function loadAllSquads(){const v=await cloudGet('squads',[[]]);return v;}
-async function saveAllSquads(s){await cloudSet('squads',s);}
+/* Firestore does not allow arrays nested directly inside arrays.
+   Our squads data is naturally [[playerObj,...], [playerObj,...], ...] —
+   an array of squads, each squad itself an array of players. That's a
+   nested array, which Firestore rejects with "invalid-argument".
+   Fix: wrap each squad in a {players: [...]} object before saving, and
+   unwrap on load. This keeps every other part of the app working with
+   plain arrays — only this storage boundary needs to know about it. */
+function wrapSquadsForFirestore(squadsArr){
+  return squadsArr.map(function(players){ return {players: players||[]}; });
+}
+function unwrapSquadsFromFirestore(wrapped){
+  if(!Array.isArray(wrapped)) return [[]];
+  return wrapped.map(function(item){
+    // Tolerate old-format data (plain arrays) already in localStorage/offline mode
+    if(Array.isArray(item)) return item;
+    return (item&&item.players)||[];
+  });
+}
+
+async function loadAllSquads(){
+  const v=await cloudGet('squads',[{players:[]}]);
+  return unwrapSquadsFromFirestore(v);
+}
+async function saveAllSquads(s){
+  await cloudSet('squads',wrapSquadsForFirestore(s));
+}
 async function loadSquadNames(){const v=await cloudGet('squad_names',[]);return v;}
 async function saveSquadNames(n){await cloudSet('squad_names',n);}
 async function activeSquad(){const s=await loadAllSquads();return s[activeSquadIdx]||[];}
