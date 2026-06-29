@@ -564,9 +564,33 @@ function generateTeamCode(){
   return word+'-'+num;
 }
 
+/* Wait for the Firebase module script (deferred, runs after this script in
+   some load orders) to finish setting up window.__firebase and signing in.
+   We poll briefly for window.__firebaseReady to even EXIST, because the
+   module script may not have run yet when this function is first called —
+   simply checking `if(window.__firebaseReady)` races against that and can
+   return too early with undefined. */
+function waitForFirebaseGlobal(timeoutMs){
+  return new Promise(function(resolve){
+    const start=Date.now();
+    (function poll(){
+      if(window.__firebaseReady){ resolve(true); return; }
+      if(Date.now()-start>timeoutMs){ resolve(false); return; }
+      setTimeout(poll,50);
+    }());
+  });
+}
+
 async function fbReady(){
-  if(window.__firebaseReady) await window.__firebaseReady;
-  return window.__firebase;
+  const gotGlobal=await waitForFirebaseGlobal(8000);
+  if(!gotGlobal) return null;
+  try{
+    await window.__firebaseReady;
+  }catch(e){
+    console.error('Firebase auth failed',e);
+    return null;
+  }
+  return window.__firebase||null;
 }
 
 /* Cloud primitives — read/write the whole team document as one object.
@@ -671,7 +695,7 @@ async function joinTeam(){
     enterApp();
   }catch(e){
     console.error(e);
-    statusEl.textContent='Connection error - check your internet and try again';
+    statusEl.textContent='Error: '+(e&&e.message?e.message:String(e))+(e&&e.code?' ['+e.code+']':'');
   }
 }
 
@@ -699,7 +723,7 @@ async function createTeam(){
     document.getElementById('gateCreatedCard').style.display='';
   }catch(e){
     console.error(e);
-    statusEl.textContent='Connection error - check your internet and try again';
+    statusEl.textContent='Error: '+(e&&e.message?e.message:String(e))+(e&&e.code?' ['+e.code+']':'');
   }
 }
 
