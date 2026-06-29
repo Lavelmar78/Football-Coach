@@ -12,6 +12,42 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <noscript><link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet"></noscript>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+  import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+  import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCnmaLVueELlGHN6vRvQgFovCFqzqwRz4k",
+    authDomain: "coachingapp-1f172.firebaseapp.com",
+    projectId: "coachingapp-1f172",
+    storageBucket: "coachingapp-1f172.firebasestorage.app",
+    messagingSenderId: "582956973561",
+    appId: "1:582956973561:web:8707881d27bc49d3451128"
+  };
+
+  const fbApp = initializeApp(firebaseConfig);
+  const auth = getAuth(fbApp);
+  const db = getFirestore(fbApp);
+
+  // Expose a minimal surface on window so the main (non-module) script can use it
+  window.__firebase = { auth, db, doc, getDoc, setDoc, onSnapshot, signInAnonymously };
+
+  // Sign in anonymously as soon as the page loads. This gives every device
+  // a stable identity Firestore rules can check, without any login UI.
+  window.__firebaseReady = new Promise((resolve) => {
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        resolve(user);
+      } else {
+        signInAnonymously(auth).catch((err) => {
+          console.error('Anonymous sign-in failed', err);
+          resolve(null);
+        });
+      }
+    });
+  });
+</script>
 <style>
 :root{--black:#0d0f12;--surface:#161a1f;--card:#1e2329;--card2:#252b33;--border:rgba(255,255,255,.08);--border2:rgba(255,255,255,.14);--amber:#f5a623;--red:#e84040;--green:#3ecf6c;--text:#e8ecf0;--muted:#7a8694;--radius:14px;--tab-h:60px;}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased;}
@@ -158,9 +194,69 @@ select option{background:#252b33;}
 .modal-close{float:right;background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1;-webkit-appearance:none;}
 .stat-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);}
 .stat-row:last-child{border-bottom:none;}
+/* Team join/create screen */
+#team-gate{position:fixed;inset:0;z-index:1000;background:var(--black);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);}
+#team-gate.hidden{display:none;}
+.gate-logo{margin-bottom:24px;text-align:center;}
+.gate-title{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:28px;color:var(--amber);}
+.gate-sub{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:2px;}
+.gate-card{width:100%;max-width:340px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:22px;margin-bottom:14px;}
+.gate-tabs{display:flex;gap:8px;margin-bottom:18px;}
+.gate-tab{flex:1;text-align:center;padding:10px;border-radius:10px;background:#252b33;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-weight:700;cursor:pointer;touch-action:manipulation;}
+.gate-tab.active{background:var(--amber);color:#0d0f12;}
+.gate-code-display{text-align:center;background:#252b33;border:2px dashed var(--amber);border-radius:12px;padding:18px;margin:14px 0;}
+.gate-code-display .code{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:32px;color:var(--amber);letter-spacing:3px;}
+.gate-code-display .hint{font-size:11px;color:var(--muted);margin-top:6px;}
+.gate-status{font-size:12px;color:var(--muted);text-align:center;margin-top:10px;min-height:16px;}
+.gate-loading{text-align:center;color:var(--muted);font-size:14px;}
+#teamCodeInput{text-transform:uppercase;letter-spacing:2px;text-align:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:20px;}
 </style>
 </head>
 <body>
+<div id="team-gate">
+  <div class="gate-logo">
+    <svg width="44" height="44" viewBox="0 0 28 28" fill="none" style="margin:0 auto 10px;display:block"><circle cx="14" cy="14" r="13" stroke="#f5a623" stroke-width="2"/><path d="M14 6l2.2 6.8H23l-5.6 4 2.2 6.8L14 19.5l-5.6 4 2.2-6.8L5 10.8h6.8z" fill="#f5a623"/></svg>
+    <div class="gate-title">Assistant Manager</div>
+    <div class="gate-sub">Match Manager</div>
+  </div>
+
+  <div class="gate-card" id="gateLoading">
+    <div class="gate-loading">Connecting&hellip;</div>
+  </div>
+
+  <div class="gate-card" id="gateMain" style="display:none">
+    <div class="gate-tabs">
+      <div class="gate-tab active" id="gateTabJoin" onclick="switchGateTab('join')">Join Team</div>
+      <div class="gate-tab" id="gateTabCreate" onclick="switchGateTab('create')">Create Team</div>
+    </div>
+
+    <div id="gateJoinPanel">
+      <label class="field-label">Team Code</label>
+      <input type="text" id="teamCodeInput" placeholder="e.g. ROVE-294" maxlength="9" autocapitalize="characters" autocomplete="off">
+      <button class="btn btn-primary" onclick="joinTeam()">Join Team</button>
+      <div class="gate-status" id="gateJoinStatus"></div>
+    </div>
+
+    <div id="gateCreatePanel" style="display:none">
+      <label class="field-label">Team Name</label>
+      <input type="text" id="newTeamName" placeholder="e.g. Rovers U10" autocomplete="off">
+      <button class="btn btn-primary" onclick="createTeam()">Create Team</button>
+      <div class="gate-status" id="gateCreateStatus"></div>
+    </div>
+  </div>
+
+  <div class="gate-card" id="gateCreatedCard" style="display:none">
+    <div style="font-size:13px;color:var(--muted);text-align:center;margin-bottom:6px">Your team code</div>
+    <div class="gate-code-display">
+      <div class="code" id="gateNewCode">----</div>
+      <div class="hint">Share this with other coaches so they can join</div>
+    </div>
+    <button class="btn btn-primary" onclick="enterApp()">Continue</button>
+  </div>
+
+  <button class="btn btn-secondary btn-sm" style="max-width:340px" onclick="useOfflineMode()">Use this device only (no sync)</button>
+</div>
+
 <div id="app-shell">
 <div id="scroll-area">
 <header>
@@ -204,6 +300,11 @@ select option{background:#252b33;}
         <option value="2-1-3">2-1-3 (2 Def, 1 Mid, 3 Att)</option>
         <option value="1-3-2">1-3-2 (1 Def, 3 Mid, 2 Att)</option>
       </select>
+    </div>
+    <div style="margin-bottom:10px">
+      <label class="field-label">Team</label>
+      <div id="teamCodeBadge" style="font-size:13px;color:var(--muted);margin-bottom:8px"></div>
+      <button class="btn btn-secondary btn-sm" style="width:100%" onclick="showSwitchTeamOption()">Switch Team</button>
     </div>
     <div style="margin-bottom:10px">
       <label class="field-label">Saved Squads</label>
@@ -308,7 +409,7 @@ select option{background:#252b33;}
     <button class="btn btn-secondary btn-sm" style="flex:1" onclick="exportHistoryJSON()">Export History</button>
     <label class="btn btn-secondary btn-sm" style="flex:1;cursor:pointer">Import History<input type="file" accept=".json" style="display:none" onchange="importHistory(this.files[0])"></label>
   </div>
-  <button class="btn btn-danger btn-sm" onclick="clearHistory()" style="width:100%">Clear Match History</button>
+  <button class="btn btn-danger btn-sm" id="btnClearHistory" onclick="clearHistory()" style="width:100%">Clear Match History</button>
 </div>
 
 </div><!-- /scroll-area -->
@@ -440,6 +541,227 @@ select option{background:#252b33;}
 <script>
 
 
+/* ===================== TEAM / CLOUD STORAGE LAYER =====================
+   Two modes:
+   1. Cloud mode (default): data lives in Firestore under /teams/{teamCode}.
+      Any coach who knows the team code can read/write the same data.
+   2. Offline mode: falls back to localStorage exactly as before, for a
+      coach who doesn't want cloud sync. No cross-device sync in this mode.
+
+   The rest of the app calls cloudGet(key) / cloudSet(key, value) — these
+   are async and route to whichever mode is active. All the higher-level
+   functions (loadAllSquads, loadSeason, loadHistory, etc.) are now async
+   wrappers around these two primitives.
+========================================================================= */
+let CURRENT_TEAM_CODE = null;   // null = offline mode
+let TEAM_DOC_CACHE = {};        // in-memory cache of the team's Firestore doc
+let TEAM_UNSUB = null;          // Firestore realtime listener unsubscribe fn
+
+function generateTeamCode(){
+  const words=['ROVE','WOLF','HAWK','LION','BEAR','FOX','TIGR','EAGL','PUMA','STAG'];
+  const word=words[Math.floor(Math.random()*words.length)];
+  const num=Math.floor(100+Math.random()*900);
+  return word+'-'+num;
+}
+
+async function fbReady(){
+  if(window.__firebaseReady) await window.__firebaseReady;
+  return window.__firebase;
+}
+
+/* Cloud primitives — read/write the whole team document as one object.
+   Firestore charges per document read/write, so we keep everything for
+   a team in a single doc rather than many small ones. */
+async function cloudLoadTeamDoc(teamCode){
+  const fb=await fbReady();
+  if(!fb) throw new Error('Firebase not ready');
+  const ref=fb.doc(fb.db,'teams',teamCode);
+  const snap=await fb.getDoc(ref);
+  return snap.exists()?snap.data():null;
+}
+
+async function cloudSaveTeamDoc(teamCode,data){
+  const fb=await fbReady();
+  if(!fb) throw new Error('Firebase not ready');
+  const ref=fb.doc(fb.db,'teams',teamCode);
+  await fb.setDoc(ref,data,{merge:true});
+}
+
+/* Generic get/set used by every higher-level loader/saver below.
+   key examples: 'squads', 'squad_names', 'season', 'history' */
+async function cloudGet(key, fallback){
+  if(CURRENT_TEAM_CODE){
+    if(TEAM_DOC_CACHE && Object.prototype.hasOwnProperty.call(TEAM_DOC_CACHE,key)){
+      return TEAM_DOC_CACHE[key];
+    }
+    try{
+      const doc=await cloudLoadTeamDoc(CURRENT_TEAM_CODE);
+      TEAM_DOC_CACHE=doc||{};
+      return (TEAM_DOC_CACHE&&Object.prototype.hasOwnProperty.call(TEAM_DOC_CACHE,key))?TEAM_DOC_CACHE[key]:fallback;
+    }catch(e){
+      console.error('cloudGet failed, using fallback',e);
+      return fallback;
+    }
+  }
+  // Offline mode: use localStorage with an 'am_offline_' prefix
+  try{
+    const raw=localStorage.getItem('am_offline_'+key);
+    return raw!=null?JSON.parse(raw):fallback;
+  }catch(e){return fallback;}
+}
+
+async function cloudSet(key, value){
+  if(CURRENT_TEAM_CODE){
+    TEAM_DOC_CACHE[key]=value;
+    try{
+      await cloudSaveTeamDoc(CURRENT_TEAM_CODE,{[key]:value});
+    }catch(e){
+      console.error('cloudSet failed',e);
+      showAlert('Sync failed - check connection');
+    }
+    return;
+  }
+  try{
+    localStorage.setItem('am_offline_'+key,JSON.stringify(value));
+  }catch(e){console.error('localStorage save failed',e);}
+}
+
+/* Realtime sync: when another coach changes the team doc, refresh the
+   in-memory cache and re-render whatever screen is currently visible. */
+function startTeamSync(teamCode){
+  if(TEAM_UNSUB){ TEAM_UNSUB(); TEAM_UNSUB=null; }
+  fbReady().then(function(fb){
+    if(!fb) return;
+    const ref=fb.doc(fb.db,'teams',teamCode);
+    TEAM_UNSUB=fb.onSnapshot(ref,function(snap){
+      if(!snap.exists()) return;
+      const newData=snap.data();
+      TEAM_DOC_CACHE=newData||{};
+      // Re-render whichever screens are visible so changes from other
+      // coaches show up without needing a manual refresh.
+      try{ if(typeof buildSquadTabs==='function') buildSquadTabsSync(); }catch(e){}
+      try{ if(document.getElementById('screen-history').classList.contains('active')) buildHistoryScreen(); }catch(e){}
+    });
+  });
+}
+
+/* ===================== TEAM GATE UI ===================== */
+function switchGateTab(tab){
+  document.getElementById('gateTabJoin').classList.toggle('active',tab==='join');
+  document.getElementById('gateTabCreate').classList.toggle('active',tab==='create');
+  document.getElementById('gateJoinPanel').style.display=tab==='join'?'':'none';
+  document.getElementById('gateCreatePanel').style.display=tab==='create'?'':'none';
+}
+
+async function joinTeam(){
+  const code=document.getElementById('teamCodeInput').value.trim().toUpperCase();
+  const statusEl=document.getElementById('gateJoinStatus');
+  if(!code){ statusEl.textContent='Enter a team code'; return; }
+  statusEl.textContent='Checking...';
+  try{
+    const doc=await cloudLoadTeamDoc(code);
+    if(!doc){
+      statusEl.textContent='Team code not found - check and try again';
+      return;
+    }
+    CURRENT_TEAM_CODE=code;
+    localStorage.setItem('am_team_code',code);
+    TEAM_DOC_CACHE=doc;
+    startTeamSync(code);
+    enterApp();
+  }catch(e){
+    console.error(e);
+    statusEl.textContent='Connection error - check your internet and try again';
+  }
+}
+
+async function createTeam(){
+  const name=document.getElementById('newTeamName').value.trim();
+  const statusEl=document.getElementById('gateCreateStatus');
+  if(!name){ statusEl.textContent='Enter a team name'; return; }
+  statusEl.textContent='Creating...';
+  try{
+    let code=generateTeamCode();
+    // Make sure the code isn't already taken (very unlikely, but check anyway)
+    let existing=await cloudLoadTeamDoc(code);
+    let attempts=0;
+    while(existing && attempts<5){ code=generateTeamCode(); existing=await cloudLoadTeamDoc(code); attempts++; }
+
+    const initialDoc={teamName:name,squads:[[]],squad_names:['Squad 1'],season:{},history:[],createdAt:Date.now()};
+    await cloudSaveTeamDoc(code,initialDoc);
+    CURRENT_TEAM_CODE=code;
+    localStorage.setItem('am_team_code',code);
+    TEAM_DOC_CACHE=initialDoc;
+    startTeamSync(code);
+
+    document.getElementById('gateMain').style.display='none';
+    document.getElementById('gateNewCode').textContent=code;
+    document.getElementById('gateCreatedCard').style.display='';
+  }catch(e){
+    console.error(e);
+    statusEl.textContent='Connection error - check your internet and try again';
+  }
+}
+
+function useOfflineMode(){
+  CURRENT_TEAM_CODE=null;
+  localStorage.setItem('am_team_code','');
+  enterApp();
+}
+
+function enterApp(){
+  document.getElementById('team-gate').classList.add('hidden');
+  if(typeof initAppAfterGate==='function') initAppAfterGate();
+}
+
+function showSwitchTeamOption(){
+  // Called from Setup screen "Switch Team" button
+  if(TEAM_UNSUB){ TEAM_UNSUB(); TEAM_UNSUB=null; }
+  localStorage.removeItem('am_team_code');
+  CURRENT_TEAM_CODE=null;
+  TEAM_DOC_CACHE={};
+  document.getElementById('team-gate').classList.remove('hidden');
+  document.getElementById('gateLoading').style.display='none';
+  document.getElementById('gateMain').style.display='';
+  document.getElementById('gateCreatedCard').style.display='none';
+  switchGateTab('join');
+}
+
+/* Try to auto-rejoin a previously used team on page load */
+async function autoRejoinTeam(){
+  const saved=localStorage.getItem('am_team_code');
+  const loadingEl=document.getElementById('gateLoading');
+  const mainEl=document.getElementById('gateMain');
+  if(saved){
+    loadingEl.querySelector('.gate-loading').textContent='Reconnecting to your team...';
+    try{
+      const doc=await cloudLoadTeamDoc(saved);
+      if(doc){
+        CURRENT_TEAM_CODE=saved;
+        TEAM_DOC_CACHE=doc;
+        startTeamSync(saved);
+        enterApp();
+        return;
+      }
+    }catch(e){ console.error('Auto-rejoin failed',e); }
+  }
+  // No saved team, or rejoin failed — show the join/create screen
+  loadingEl.style.display='none';
+  mainEl.style.display='';
+}
+
+/* INIT: wait for Firebase auth before showing the gate */
+(function initGate(){
+  fbReady().then(function(){
+    autoRejoinTeam();
+  }).catch(function(){
+    // Firebase totally unavailable (e.g. no internet on first load) —
+    // fall back to offline mode automatically so the app still works.
+    document.getElementById('gateLoading').style.display='none';
+    document.getElementById('gateMain').style.display='';
+  });
+}());
+
 /* STATE */
 let playersData=[], blocks=[], currentBlockIdx=0, timerInterval=null;
 let elapsedSeconds=0, matchStartWallTime=null, matchStartElapsed=0;
@@ -461,7 +783,7 @@ const gc=function(id){var el=$(id);return !!(el&&el.checked);};
 function showAlert(msg,type='error'){const el=$('alertBox');el.textContent=msg;el.className='alert '+type;clearTimeout(el._t);el._t=setTimeout(()=>{el.className='alert';},5000);}
 function shuffle(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 function showTab(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.tabbar-btn').forEach(b=>b.classList.remove('active'));$(id).classList.add('active');const t=$('tab-'+id.replace('screen-',''));if(t)t.classList.add('active');}
-function openModal(id){if(id==='modal-injury')buildInjuryList();if(id==='modal-stats')buildSeasonStats();if(id==='modal-report'){var box=$('reportBox');if(box&&!box.dataset.historyReport){var rpt=buildMatchReport();if(box)box.textContent=rpt;}}$(id).classList.add('open');}
+function openModal(id){if(id==='modal-injury')buildInjuryList();if(id==='modal-stats'){$(id).classList.add('open');buildSeasonStats();return;}if(id==='modal-report'){var box=$('reportBox');if(box&&!box.dataset.historyReport){var rpt=buildMatchReport();if(box)box.textContent=rpt;}}$(id).classList.add('open');}
 function closeModal(e,id){
   if(!e||e.target===$(id)){
     if(id==='modal-report'){var box=$('reportBox');if(box)box.dataset.historyReport='';}
@@ -472,18 +794,45 @@ function buildFormationGrid(){var s=$('formationSelect');if(s)s.value=currentFor
 function selectFormation(f){currentFormation=f;buildFormationGrid();}
 
 /* SQUAD MANAGEMENT */
-function loadAllSquads(){return JSON.parse(localStorage.getItem('cpe_squads')||'[[]]');}
-function saveAllSquads(s){localStorage.setItem('cpe_squads',JSON.stringify(s));}
-function activeSquad(){const s=loadAllSquads();return s[activeSquadIdx]||[];}
-function buildSquadTabs(){const squads=loadAllSquads();const names=JSON.parse(localStorage.getItem('cpe_squad_names')||'[]');$('squadTabs').innerHTML=squads.map((_,i)=>'<button class="squad-tab'+(i===activeSquadIdx?' active':'')+'" onclick="switchSquad('+i+')">'+(names[i]||'Squad '+(i+1))+'</button>').join('');}
+async function loadAllSquads(){const v=await cloudGet('squads',[[]]);return v;}
+async function saveAllSquads(s){await cloudSet('squads',s);}
+async function loadSquadNames(){const v=await cloudGet('squad_names',[]);return v;}
+async function saveSquadNames(n){await cloudSet('squad_names',n);}
+async function activeSquad(){const s=await loadAllSquads();return s[activeSquadIdx]||[];}
+async function buildSquadTabs(){
+  const squads=await loadAllSquads();
+  const names=await loadSquadNames();
+  $('squadTabs').innerHTML=squads.map((_,i)=>'<button class="squad-tab'+(i===activeSquadIdx?' active':'')+'" onclick="switchSquad('+i+')">'+(names[i]||'Squad '+(i+1))+'</button>').join('');
+}
+// Non-async variant for the realtime-sync callback, which already has the
+// cache populated and just needs the DOM refreshed without an extra fetch.
+function buildSquadTabsSync(){
+  const squads=(TEAM_DOC_CACHE&&TEAM_DOC_CACHE.squads)||[[]];
+  const names=(TEAM_DOC_CACHE&&TEAM_DOC_CACHE.squad_names)||[];
+  const el=$('squadTabs');
+  if(!el) return;
+  el.innerHTML=squads.map((_,i)=>'<button class="squad-tab'+(i===activeSquadIdx?' active':'')+'" onclick="switchSquad('+i+')">'+(names[i]||'Squad '+(i+1))+'</button>').join('');
+}
 function switchSquad(i){activeSquadIdx=i;buildSquadTabs();}
-function newSquad(){const s=loadAllSquads();const n=JSON.parse(localStorage.getItem('cpe_squad_names')||'[]');s.push([]);n.push('Squad '+s.length);saveAllSquads(s);localStorage.setItem('cpe_squad_names',JSON.stringify(n));activeSquadIdx=s.length-1;buildSquadTabs();showAlert('New squad created','success');}
-function deleteSquad(){const s=loadAllSquads();if(s.length<=1){showAlert('Cannot delete last squad');return;}const n=JSON.parse(localStorage.getItem('cpe_squad_names')||'[]');s.splice(activeSquadIdx,1);n.splice(activeSquadIdx,1);saveAllSquads(s);localStorage.setItem('cpe_squad_names',JSON.stringify(n));activeSquadIdx=Math.max(0,activeSquadIdx-1);buildSquadTabs();showAlert('Squad deleted','success');}
+async function newSquad(){
+  const s=await loadAllSquads();const n=await loadSquadNames();
+  s.push([]);n.push('Squad '+s.length);
+  await saveAllSquads(s);await saveSquadNames(n);
+  activeSquadIdx=s.length-1;await buildSquadTabs();showAlert('New squad created','success');
+}
+async function deleteSquad(){
+  const s=await loadAllSquads();
+  if(s.length<=1){showAlert('Cannot delete last squad');return;}
+  const n=await loadSquadNames();
+  s.splice(activeSquadIdx,1);n.splice(activeSquadIdx,1);
+  await saveAllSquads(s);await saveSquadNames(n);
+  activeSquadIdx=Math.max(0,activeSquadIdx-1);await buildSquadTabs();showAlert('Squad deleted','success');
+}
 
-function buildPlayerInputs(){
+async function buildPlayerInputs(){
   const count=gn('squadCount');
   if(count<7||count>20){showAlert('Squad size must be 7-20');return;}
-  const saved=activeSquad();
+  const saved=await activeSquad();
   let html='';
   for(let i=0;i<count;i++){
     const p=saved[i]||{};
@@ -519,25 +868,25 @@ function toggleAvail(i){const b=$('pavailbtn'+i);const r=$('prow'+i);const was=b
 function toggleInj(i){const b=$('pinjbtn'+i);const r=$('prow'+i);const was=b.classList.contains('on');b.classList.toggle('on',!was);r.classList.toggle('injured',!was);}
 function updateSquadBadge(){const c=gn('squadCount');let a=0;for(let i=0;i<c;i++){if(!($('pavailbtn'+i)&&$('pavailbtn'+i).classList.contains('off')))a++;}const el=$('squadCountBadge');if(el)el.textContent=a+' available';}
 function refreshGKSelectors(){updateSquadBadge();const c=gn('squadCount');let o='';for(let i=0;i<c;i++){if($('pavailbtn'+i)&&$('pavailbtn'+i).classList.contains('off'))continue;const n=gv('pname'+i);if(!n)continue;o+='<option value="'+n+'">'+n+'</option>';}$('gk1').innerHTML=o;$('gk2').innerHTML=o;if($('gk2').options.length>1)$('gk2').options[1].selected=true;}
-function saveSquad(){const c=gn('squadCount');const s=[];for(let i=0;i<c;i++){s.push({name:gv('pname'+i),available:!($('pavailbtn'+i)&&$('pavailbtn'+i).classList.contains('off')),injured:!!($('pinjbtn'+i)&&$('pinjbtn'+i).classList.contains('on')),def:gc('p'+i+'_def'),midc:gc('p'+i+'_midc'),midw:gc('p'+i+'_midw'),att:gc('p'+i+'_att'),note:gv('pnote'+i)});}const all=loadAllSquads();all[activeSquadIdx]=s;saveAllSquads(all);showAlert('Squad saved!','success');}
+async function saveSquad(){const c=gn('squadCount');const s=[];for(let i=0;i<c;i++){s.push({name:gv('pname'+i),available:!($('pavailbtn'+i)&&$('pavailbtn'+i).classList.contains('off')),injured:!!($('pinjbtn'+i)&&$('pinjbtn'+i).classList.contains('on')),def:gc('p'+i+'_def'),midc:gc('p'+i+'_midc'),midw:gc('p'+i+'_midw'),att:gc('p'+i+'_att'),note:gv('pnote'+i)});}const all=await loadAllSquads();all[activeSquadIdx]=s;await saveAllSquads(all);showAlert('Squad saved!','success');}
 function collectPlayers(){const c=gn('squadCount');const p=[];for(let i=0;i<c;i++){if($('pavailbtn'+i)&&$('pavailbtn'+i).classList.contains('off'))continue;if($('pinjbtn'+i)&&$('pinjbtn'+i).classList.contains('on'))continue;const n=gv('pname'+i).trim();if(!n)continue;p.push({name:n,positions:{def:gc('p'+i+'_def'),midc:gc('p'+i+'_midc'),midw:gc('p'+i+'_midw'),att:gc('p'+i+'_att')},note:gv('pnote'+i),outfieldMins:0,totalMins:0});}return p;}
 
 /* SEASON DATA */
-function loadSeason(){return JSON.parse(localStorage.getItem('cpe_season2')||'{}');}
-function saveSeason(d){localStorage.setItem('cpe_season2',JSON.stringify(d));}
-function getPlayerRecord(s,n){return s[n]||{matches:0,missedMatches:0,actualMins:0,attributedMins:0,gkMins:0,gkFairMins:0,goals:0,assists:0,lastStartedSub:false};}
+async function loadSeason(){return await cloudGet('season',{});}
+async function saveSeason(d){await cloudSet('season',d);}
+function getPlayerRecord(s,n){return s[n]||{matches:0,missedMatches:0,actualMins:0,attributedMins:0,gkMins:0,gkFairMins:0,gkOutfieldMins:0,goals:0,assists:0,lastStartedSub:false};}
 function seasonFairMins(r){return r.actualMins+(r.attributedMins||0)+(r.gkFairMins||0);}
-function attachSeasonDebt(players){const s=loadSeason();const recs=players.map(p=>getPlayerRecord(s,p.name));const maxFair=recs.reduce(function(m,r){return Math.max(m,seasonFairMins(r));},0);players.forEach(function(p,i){p.seasonFairMins=seasonFairMins(recs[i]);p.seasonDebt=maxFair-p.seasonFairMins;p.lastStartedSub=!!(recs[i].lastStartedSub);});}
+async function attachSeasonDebt(players){const s=await loadSeason();const recs=players.map(p=>getPlayerRecord(s,p.name));const maxFair=recs.reduce(function(m,r){return Math.max(m,seasonFairMins(r));},0);players.forEach(function(p,i){p.seasonFairMins=seasonFairMins(recs[i]);p.seasonDebt=maxFair-p.seasonFairMins;p.lastStartedSub=!!(recs[i].lastStartedSub);});}
 
 /* PLAN GENERATION */
-function onGeneratePlan(){const e=generatePlan();if(!e)showTab('screen-plan');}
+async function onGeneratePlan(){const e=await generatePlan();if(!e)showTab('screen-plan');}
 
-function generatePlan(){
+async function generatePlan(){
   matchLengthMins=gn('matchLength');
   if(matchLengthMins<10||matchLengthMins>120){showAlert('Match length must be 10-120 mins');return 'invalid';}
   playersData=collectPlayers();
   if(playersData.length<7){showAlert('Need at least 7 available players');return 'few';}
-  attachSeasonDebt(playersData);
+  await attachSeasonDebt(playersData);
   const gk1n=gv('gk1'),gk2n=gv('gk2');
   if(!gk1n||!gk2n){showAlert('Select both goalkeepers');return 'no gks';}
   if(gk1n===gk2n){showAlert('1st and 2nd half GKs must differ');return 'same gk';}
@@ -967,8 +1316,8 @@ function buildInjuryList(){if(!planGenerated){$('injuryPlayerList').innerHTML='<
 function markInjured(name){const p=playersData.find(function(q){return q.name===name;});if(!p)return;p.injured=true;const remaining=blocks.slice(currentBlockIdx+1);remaining.forEach(function(blk){if(blk.lineup.includes(p)){const bench=playersData.filter(function(q){return !q.injured&&!blk.lineup.includes(q);});if(bench.length){const repl=bench.slice().sort(function(a,b){return a.outfieldMins-b.outfieldMins;})[0];const idx=blk.lineup.indexOf(p);blk.lineup[idx]=repl;}else blk.lineup=blk.lineup.filter(function(q){return q!==p;});}});closeModal(null,'modal-injury');renderPlanTable();renderMinutesTable();renderSubList();showAlert(name+' removed from remaining plan','success');}
 
 /* SEASON STATS */
-function buildSeasonStats(){
-  const season=loadSeason();const keys=Object.keys(season).sort();const count=gn('squadCount');
+async function buildSeasonStats(){
+  const season=await loadSeason();const keys=Object.keys(season).sort();const count=gn('squadCount');
   for(let i=0;i<count;i++){const n=gv('pname'+i);if(n&&!season[n])keys.push(n);}
   const unique=[...new Set(keys)];
   if(!unique.length){$('seasonStatsList').innerHTML='<p style="color:var(--muted);font-size:13px">No season data yet. Save a match to start tracking.</p>';return;}
@@ -982,36 +1331,12 @@ function buildSeasonStats(){
     const diffStr=diff===0?'-':(diff<0?'<span style="color:#ff8080">'+diff+'</span>':'<span style="color:#3ecf6c">+'+diff+'</span>');
     const curStr=row.cur>0?' <span style="color:var(--amber);font-size:10px">(+'+row.cur+')</span>':'';
     var gkCell=(row.r.gkMins||0)>0?'<span style="color:var(--amber)">'+(row.r.gkMins||0)+'</span>':'<span style="color:var(--muted)">-</span>';
-    html+='<tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 4px;font-weight:600">'+row.name+curStr+'</td><td style="text-align:right;padding:7px 4px">'+row.r.matches+'</td><td style="text-align:right;padding:7px 4px;color:#ff8080">'+(row.r.missedMatches||0)+'</td><td style="text-align:right;padding:7px 4px">'+row.r.actualMins+'</td><td style="text-align:right;padding:7px 4px">'+gkCell+'</td><td style="text-align:right;padding:7px 4px;color:#7a8694">'+(row.r.attributedMins||0)+'</td><td style="text-align:right;padding:7px 4px;font-weight:700">'+row.fair+'</td><td style="text-align:right;padding:7px 4px">'+diffStr+'</td><td style="text-align:right;padding:7px 4px;color:#3ecf6c;font-weight:700">'+(row.r.goals||0)+'</td><td style="text-align:right;padding:7px 4px;color:#7a8694">'+(row.r.assists||0)+'</td></tr>';
+    html+='<tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 4px;font-weight:600">'+row.name+curStr+'</td><td style="text-align:right;padding:7px 4px">'+row.r.matches+'</td><td style="text-align:right;padding:7px 4px;color:#ff8080">'+(row.r.missedMatches||0)+'</td><td style="text-align:right;padding:7px 4px">'+(row.r.actualMins+(row.r.gkOutfieldMins||0))+'</td><td style="text-align:right;padding:7px 4px">'+gkCell+'</td><td style="text-align:right;padding:7px 4px;color:#7a8694">'+(row.r.attributedMins||0)+'</td><td style="text-align:right;padding:7px 4px;font-weight:700">'+row.fair+'</td><td style="text-align:right;padding:7px 4px">'+diffStr+'</td><td style="text-align:right;padding:7px 4px;color:#3ecf6c;font-weight:700">'+(row.r.goals||0)+'</td><td style="text-align:right;padding:7px 4px;color:#7a8694">'+(row.r.assists||0)+'</td></tr>';
   });
   html+='</tbody></table></div>';
   $('seasonStatsList').innerHTML=html;
 }
-function saveSeasonStats(){
-  if(!planGenerated){showAlert('Generate a plan first');return;}
-  const season=loadSeason();const count=gn('squadCount');
-  const playedMins=playersData.map(function(p){return p.outfieldMins;}).filter(function(m){return m>0;});
-  const matchAvg=playedMins.length?Math.round(playedMins.reduce(function(a,b){return a+b;},0)/playedMins.length):0;
-  const matchGoals={},matchAssists={};
-  goalLog.filter(function(g){return g.team==='home';}).forEach(function(g){if(g.scorer)matchGoals[g.scorer]=(matchGoals[g.scorer]||0)+1;if(g.assist)matchAssists[g.assist]=(matchAssists[g.assist]||0)+1;});
-  playersData.forEach(function(p){const r=getPlayerRecord(season,p.name);r.matches++;r.actualMins+=p.outfieldMins;r.goals=(r.goals||0)+(matchGoals[p.name]||0);r.assists=(r.assists||0)+(matchAssists[p.name]||0);season[p.name]=r;});
-  // Mark absent: any player in the saved squad who did NOT appear in playersData
-  // (either marked unavailable or injured). Use saved squad not DOM — DOM may not
-  // be rendered if the user navigated straight to Match without rebuilding inputs.
-  const savedSquad=activeSquad();
-  savedSquad.forEach(function(sp){
-    if(!sp.name)return;
-    const played=playersData.some(function(p){return p.name===sp.name;});
-    if(!played){
-      const r=getPlayerRecord(season,sp.name);
-      r.missedMatches=(r.missedMatches||0)+1;
-      r.attributedMins=(r.attributedMins||0)+matchAvg;
-      season[sp.name]=r;
-    }
-  });
-  saveSeason(season);showAlert('Match saved to season!','success');buildSeasonStats();
-}
-/* clearSeasonStats defined in history section */
+/* saveSeasonStats and clearSeasonStats are defined later, in the MATCH HISTORY section */
 
 /* EXPORT / IMPORT */
 function downloadFile(filename,content,mime){
@@ -1049,12 +1374,12 @@ function showTextFallback(filename,content){
   if(titleEl)titleEl.textContent=filename;
   openModal('modal-share');
 }
-function exportSeasonJSON(){const data=loadSeason();downloadFile('season_data.json',JSON.stringify(data,null,2),'application/json');}
-function exportSeasonCSV(){
-  const season=loadSeason();const keys=Object.keys(season).sort();
+async function exportSeasonJSON(){const data=await loadSeason();downloadFile('season_data.json',JSON.stringify(data,null,2),'application/json');}
+async function exportSeasonCSV(){
+  const season=await loadSeason();const keys=Object.keys(season).sort();
   if(!keys.length){showAlert('No season data to export');return;}
   let csv='Player,Matches Played,Matches Missed,Field Mins,GK Mins,Absence Credit,GK Fair Credit,Fair Total,Goals,Assists\n';
-  keys.forEach(function(name){const r=getPlayerRecord(season,name);const fair=seasonFairMins(r);csv+='"'+name+'",'+r.matches+','+(r.missedMatches||0)+','+r.actualMins+','+(r.gkMins||0)+','+(r.attributedMins||0)+','+(r.gkFairMins||0)+','+fair+','+(r.goals||0)+','+(r.assists||0)+'\n';});
+  keys.forEach(function(name){const r=getPlayerRecord(season,name);const fair=seasonFairMins(r);csv+='"'+name+'",'+r.matches+','+(r.missedMatches||0)+','+(r.actualMins+(r.gkOutfieldMins||0))+','+(r.gkMins||0)+','+(r.attributedMins||0)+','+(r.gkFairMins||0)+','+fair+','+(r.goals||0)+','+(r.assists||0)+'\n';});
   downloadFile('season_stats.csv',csv,'text/csv');
 }
 function exportMatchCSV(){
@@ -1067,7 +1392,7 @@ function exportMatchCSV(){
   blocks.forEach(function(blk,i){const label=i===0?'Kickoff':blk.subAt+'\'';const names=blk.lineup.map(function(p){return p.name;}).join(' / ');const subs=(blk.subs||[]).filter(function(s){return s.off&&s.on;}).map(function(s){return s.off.name+'->'+s.on.name;}).join(' | ');csv+='"'+label+'","'+names+'","'+subs+'"\n';});
   downloadFile('match_plan.csv',csv,'text/csv');
 }
-function importSeason(file){if(!file)return;const reader=new FileReader();reader.onload=function(e){try{const data=JSON.parse(e.target.result);let valid=true;Object.values(data).forEach(function(r){if(typeof r.matches==='undefined')valid=false;});if(!valid)throw new Error('Invalid format');saveSeason(data);showAlert('Season data imported!','success');buildSeasonStats();}catch(err){showAlert('Import failed - use a previously exported JSON file');}};reader.readAsText(file);}
+function importSeason(file){if(!file)return;const reader=new FileReader();reader.onload=async function(e){try{const data=JSON.parse(e.target.result);let valid=true;Object.values(data).forEach(function(r){if(typeof r.matches==='undefined')valid=false;});if(!valid)throw new Error('Invalid format');await saveSeason(data);showAlert('Season data imported!','success');buildSeasonStats();}catch(err){showAlert('Import failed - use a previously exported JSON file');}};reader.readAsText(file);}
 
 
 /* WHATSAPP MATCH REPORT */
@@ -1186,9 +1511,9 @@ function copyFallback(txt){
 }
 
 /* SQUAD EXPORT / IMPORT */
-function exportSquadJSON(){
-  const squads = loadAllSquads();
-  const names  = JSON.parse(localStorage.getItem('cpe_squad_names') || '[]');
+async function exportSquadJSON(){
+  const squads = await loadAllSquads();
+  const names  = await loadSquadNames();
   const data   = {
     version: 1,
     squads:  squads,
@@ -1201,28 +1526,29 @@ function exportSquadJSON(){
 function importSquadJSON(file){
   if(!file) return;
   const reader = new FileReader();
-  reader.onload = function(e){
+  reader.onload = async function(e){
     try{
       const data = JSON.parse(e.target.result);
       // Accept both a single squad array and the full multi-squad format
       if(Array.isArray(data)){
         // Single squad array exported directly
-        const squads = loadAllSquads();
+        const squads = await loadAllSquads();
         squads[activeSquadIdx] = data;
-        saveAllSquads(squads);
+        await saveAllSquads(squads);
         showAlert('Squad imported into current slot!', 'success');
       } else if(data.squads && Array.isArray(data.squads)){
         // Full export format
-        saveAllSquads(data.squads);
-        if(data.names) localStorage.setItem('cpe_squad_names', JSON.stringify(data.names));
+        await saveAllSquads(data.squads);
+        if(data.names) await saveSquadNames(data.names);
         activeSquadIdx = data.activeSquadIdx || 0;
         showAlert('All squads imported!', 'success');
       } else {
         throw new Error('Unrecognised format');
       }
-      buildSquadTabs();
+      await buildSquadTabs();
       // Rebuild inputs if count is known
-      const firstSquad = loadAllSquads()[activeSquadIdx] || [];
+      const allSquadsNow = await loadAllSquads();
+      const firstSquad = allSquadsNow[activeSquadIdx] || [];
       if(firstSquad.length){
         $('squadCount').value = firstSquad.length;
         buildPlayerInputs();
@@ -1244,12 +1570,12 @@ function importSquadJSON(file){
      lineups:[{subAt, players:[name], gk:name}]  <- for analysis
    }
 ═════════════════════════════════════════════════════════════════════════ */
-function loadHistory(){ return JSON.parse(localStorage.getItem('am_history')||'[]'); }
-function saveHistory(h){ localStorage.setItem('am_history',JSON.stringify(h)); }
+async function loadHistory(){ return await cloudGet('history',[]); }
+async function saveHistory(h){ await cloudSet('history',h); }
 
-function saveSeasonStats(){
+async function saveSeasonStats(){
   if(!planGenerated){ showAlert('Generate a plan first'); return; }
-  const season = loadSeason();
+  const season = await loadSeason();
   const count  = gn('squadCount');
   const playedMins = playersData.map(function(p){return p.outfieldMins;}).filter(function(m){return m>0;});
   const matchAvg   = playedMins.length ? Math.round(playedMins.reduce(function(a,b){return a+b;},0)/playedMins.length) : 0;
@@ -1281,13 +1607,11 @@ function saveSeasonStats(){
     r.goals=(r.goals||0)+(matchGoals[p.name]||0);
     r.assists=(r.assists||0)+(matchAssists[p.name]||0);
     if(gkFull&&gkPlayers.has(p.name)){
-      // GK in full mode: their fair contribution = match average outfield mins.
-      // actualMins stores their real outfield time separately (for stats display).
-      // gkFairMins is used in seasonFairMins so rotation treats them equally.
-      // We do NOT add outfield mins to actualMins for GKs — their time in goal
-      // is tracked in gkMins; their outfield time is real but structurally limited.
-      r.actualMins+=p.outfieldMins;  // real outfield played (for display)
-      r.gkFairMins=(r.gkFairMins||0)+matchAvg;  // fair credit = match average
+      // GK fair mins = match average only.
+      // Do NOT add their outfield mins to actualMins — that would inflate
+      // their fair total. Store real outfield time in gkOutfieldMins for display.
+      r.gkOutfieldMins=(r.gkOutfieldMins||0)+p.outfieldMins;
+      r.gkFairMins=(r.gkFairMins||0)+matchAvg;
     } else {
       r.actualMins+=p.outfieldMins;  // normal outfield player
     }
@@ -1295,7 +1619,7 @@ function saveSeasonStats(){
     r.lastStartedSub=!block0names.has(p.name);
     season[p.name]=r;
   });
-  const savedSquad=activeSquad();
+  const savedSquad=await activeSquad();
   savedSquad.forEach(function(sp){
     if(!sp.name) return;
     const played=playersData.some(function(p){return p.name===sp.name;});
@@ -1306,10 +1630,10 @@ function saveSeasonStats(){
       season[sp.name]=r;
     }
   });
-  saveSeason(season);
+  await saveSeason(season);
 
   // Save to match history
-  const history = loadHistory();
+  const history = await loadHistory();
   const opponent = gv('opponentName')||'Unknown';
   const playerMins = {};
   playersData.forEach(function(p){ playerMins[p.name]=p.outfieldMins; });
@@ -1335,12 +1659,12 @@ function saveSeasonStats(){
     playerMins: playerMins,
     lineups: lineups
   });
-  saveHistory(history);
+  await saveHistory(history);
   showAlert('Match saved!','success');
   buildSeasonStats();
 }
 
-function clearSeasonStats(){
+async function clearSeasonStats(){
   // window.confirm is blocked in iOS PWA standalone mode — use inline confirmation
   var btn=$('btnClearSeason');
   if(btn&&btn.dataset.confirm!=='yes'){
@@ -1355,16 +1679,18 @@ function clearSeasonStats(){
     return;
   }
   if(btn){btn.dataset.confirm='';btn.textContent='Reset Season';btn.style.background='';}
+  await saveSeason({});
+  await saveHistory([]);
   localStorage.removeItem('cpe_season2');
   localStorage.removeItem('am_history');
   showAlert('Season and match history cleared','success');
   buildSeasonStats();
 }
 
-function buildHistoryScreen(){
-  const history=loadHistory();
+async function buildHistoryScreen(){
+  const history=await loadHistory();
   buildHistoryOverview(history);
-  buildHistoryAnalysis(history);
+  await buildHistoryAnalysis(history);
   buildHistoryList(history);
 }
 
@@ -1389,7 +1715,7 @@ function buildHistoryOverview(history){
     '<div class="stat-box"><div class="stat-box-val">'+(played?Math.round((wins/played)*100)+'%':'—')+'</div><div class="stat-box-lbl">Win Rate</div></div>';
 }
 
-function buildHistoryAnalysis(history){
+async function buildHistoryAnalysis(history){
   const el=$('histAnalysis');
   if(!el) return;
   if(history.length<2){ el.innerHTML='<p style="color:var(--muted);font-size:13px">Play more matches to unlock analysis.</p>'; return; }
@@ -1425,7 +1751,7 @@ function buildHistoryAnalysis(history){
     });
   });
   // Add goal/assist data from season
-  const season=loadSeason();
+  const season=await loadSeason();
   Object.keys(season).forEach(function(name){
     if(playerImpact[name]){
       playerImpact[name].goals=season[name].goals||0;
@@ -1499,38 +1825,46 @@ function buildHistoryList(history){
   el.innerHTML=html;
 }
 
-function exportHistoryJSON(){
-  const data=loadHistory();
+async function exportHistoryJSON(){
+  const data=await loadHistory();
   downloadFile('match_history.json',JSON.stringify(data,null,2),'application/json');
 }
 function importHistory(file){
   if(!file) return;
   var reader=new FileReader();
-  reader.onload=function(e){
+  reader.onload=async function(e){
     try{
       var data=JSON.parse(e.target.result);
       if(!Array.isArray(data)) throw new Error('Invalid');
-      saveHistory(data);
+      await saveHistory(data);
       showAlert('History imported!','success');
       buildHistoryScreen();
     }catch(err){showAlert('Import failed');}
   };
   reader.readAsText(file);
 }
-function clearHistory(){
-  if(confirm('Delete all match history?')){
-    localStorage.removeItem('am_history');
-    showAlert('History cleared','success');
-    buildHistoryScreen();
+async function clearHistory(){
+  var btn=$('btnClearHistory');
+  if(btn&&btn.dataset.confirm!=='yes'){
+    btn.dataset.confirm='yes';
+    btn.textContent='Tap again to confirm';
+    btn.style.background='#ff4444';
+    setTimeout(function(){if(btn){btn.dataset.confirm='';btn.textContent='Clear Match History';btn.style.background='';}},3000);
+    return;
   }
+  if(btn){btn.dataset.confirm='';btn.textContent='Clear Match History';btn.style.background='';}
+  await saveHistory([]);
+  localStorage.removeItem('am_history');
+  showAlert('History cleared','success');
+  buildHistoryScreen();
 }
 
 
-function showHistoryReport(matchId){
-  var history=loadHistory();
+async function showHistoryReport(matchId){
+  var history=await loadHistory();
   var m=history.find(function(h){return h.id===matchId;});
   if(!m){showAlert('Match not found');return;}
-  var txt=buildHistoryMatchReport(m);
+  var txt=await buildHistoryMatchReport(m);
   var box=$('reportBox');
   if(box){
     box.dataset.historyReport='1';
@@ -1539,7 +1873,7 @@ function showHistoryReport(matchId){
   openModal('modal-report');
 }
 
-function buildHistoryMatchReport(m){
+async function buildHistoryMatchReport(m){
   var tn=gv('teamName')||'Us';
   var formation=m.formation||'2-3-1';
   var roles=FORMATION6[formation]||['def','def','midc','midw','att','att'];
@@ -1559,7 +1893,7 @@ function buildHistoryMatchReport(m){
   if(m.lineups&&m.lineups.length){
     r+='\nROTATION PLAN\n';
     var squadData={};
-    loadAllSquads().forEach(function(sq){sq.forEach(function(p){if(p.name)squadData[p.name]={def:p.def||false,midc:p.midc||false,midw:p.midw||false,att:p.att||false};});});
+    (await loadAllSquads()).forEach(function(sq){sq.forEach(function(p){if(p.name)squadData[p.name]={def:p.def||false,midc:p.midc||false,midw:p.midw||false,att:p.att||false};});});
     var getPos=function(n){return squadData[n]||{def:false,midc:false,midw:false,att:false};};
     var assignPos=function(players,gk){
       var of=players.filter(function(n){return n!==gk;}),placed=new Array(roles.length).fill(null),rem=of.slice();
@@ -1588,8 +1922,8 @@ function buildHistoryMatchReport(m){
 }
 
 
-function openEditMatch(matchId){
-  var history=loadHistory();
+async function openEditMatch(matchId){
+  var history=await loadHistory();
   var m=history.find(function(h){return h.id===matchId;});
   if(!m){showAlert('Match not found');return;}
   $('editMatchId').value=matchId;
@@ -1600,22 +1934,22 @@ function openEditMatch(matchId){
   $('modal-edit-match').classList.add('open');
 }
 
-function saveMatchEdit(){
+async function saveMatchEdit(){
   var matchId=parseInt($('editMatchId').value);
-  var history=loadHistory();
+  var history=await loadHistory();
   var idx=history.findIndex(function(h){return h.id===matchId;});
   if(idx===-1){showAlert('Match not found');return;}
   history[idx].opponent=$('editOpponent').value||history[idx].opponent;
   history[idx].date=$('editDate').value||history[idx].date;
   history[idx].scoreUs=parseInt($('editScoreUs').value)||0;
   history[idx].scoreThem=parseInt($('editScoreThem').value)||0;
-  saveHistory(history);
+  await saveHistory(history);
   closeModal(null,'modal-edit-match');
   buildHistoryScreen();
   showAlert('Match updated','success');
 }
 
-function deleteMatchFromHistory(){
+async function deleteMatchFromHistory(){
   var matchId=parseInt($('editMatchId').value);
   var btn=$('btnDeleteMatch');
   if(btn&&btn.dataset.confirm!=='yes'){
@@ -1625,11 +1959,11 @@ function deleteMatchFromHistory(){
     setTimeout(function(){if(btn){btn.dataset.confirm='';btn.textContent='Delete Match';btn.style.background='';}},3000);
     return;
   }
-  var history=loadHistory();
+  var history=await loadHistory();
   var idx=history.findIndex(function(h){return h.id===matchId;});
   if(idx===-1)return;
   history.splice(idx,1);
-  saveHistory(history);
+  await saveHistory(history);
   closeModal(null,'modal-edit-match');
   buildHistoryScreen();
   showAlert('Match deleted','success');
@@ -1637,13 +1971,19 @@ function deleteMatchFromHistory(){
 
 function openOppGoalModal(){$('oppGoalMinute').value=Math.floor(elapsedSeconds/60)||'';$('modal-opp-goal').classList.add('open');}
 function confirmOppGoal(){var min=parseInt($('oppGoalMinute').value)||Math.floor(elapsedSeconds/60)||1;goalLog.push({min:min,scorer:null,assist:null,team:'away'});goalLog.sort(function(a,b){return a.min-b.min;});scoreAway++;updateScoreDisplay();closeModal(null,'modal-opp-goal');}
-/* INIT */
-(function init(){
+/* INIT — called once the team gate is dismissed (team joined/created, or offline mode chosen) */
+async function initAppAfterGate(){
+  const badge=$('teamCodeBadge');
+  if(badge){
+    badge.innerHTML=CURRENT_TEAM_CODE
+      ? 'Connected: <strong style="color:var(--amber)">'+CURRENT_TEAM_CODE+'</strong> &middot; shared with other coaches'
+      : 'This device only &middot; not shared with other coaches';
+  }
   buildFormationGrid();
-  buildSquadTabs();
-  const saved=activeSquad();
-  if(saved.length){$('squadCount').value=saved.length;buildPlayerInputs();}
-}());
+  await buildSquadTabs();
+  const saved=await activeSquad();
+  if(saved.length){$('squadCount').value=saved.length;await buildPlayerInputs();}
+}
 
 
 </script>
