@@ -337,6 +337,8 @@ select option{background:#252b33;}
 
 <!-- PLAN -->
 <div id="screen-plan" class="screen">
+  <!-- Live match view for assistant coaches -->
+  <div id="liveMatchBanner" style="display:none" class="card" style="border:1px solid var(--amber);margin-bottom:14px;background:#1a1f28;"></div>
   <div class="btn-row">
     <button class="btn btn-secondary btn-sm" style="flex:1" onclick="onGeneratePlan()">Regenerate</button>
     <button class="btn btn-secondary btn-sm" style="flex:1" onclick="sharePlan()">Share Plan</button>
@@ -665,6 +667,13 @@ function startTeamSync(teamCode){
       // coaches show up without needing a manual refresh.
       try{ if(typeof buildSquadTabs==='function') buildSquadTabsSync(); }catch(e){}
       try{ if(document.getElementById('screen-history').classList.contains('active')) buildHistoryScreen(); }catch(e){}
+      try{ if(typeof syncLiveMatchFromCloud==='function') syncLiveMatchFromCloud(newData); }catch(e){}
+      try{
+        // Show a dot on the Plan tab when a live match is active
+        var lmActive=newData&&newData.liveMatch&&newData.liveMatch.active;
+        var planTab=document.getElementById('tab-screen-plan');
+        if(planTab) planTab.style.color=lmActive?'var(--green)':'';
+      }catch(e){}
     });
   });
 }
@@ -927,7 +936,7 @@ function seasonFairMins(r){return r.actualMins+(r.attributedMins||0)+(r.gkFairMi
 async function attachSeasonDebt(players){const s=await loadSeason();const recs=players.map(p=>getPlayerRecord(s,p.name));const maxFair=recs.reduce(function(m,r){return Math.max(m,seasonFairMins(r));},0);players.forEach(function(p,i){p.seasonFairMins=seasonFairMins(recs[i]);p.seasonDebt=maxFair-p.seasonFairMins;p.lastStartedSub=!!(recs[i].lastStartedSub);});}
 
 /* PLAN GENERATION */
-async function onGeneratePlan(){const e=await generatePlan();if(!e)showTab('screen-plan');}
+async function onGeneratePlan(){const e=await generatePlan();if(!e){showTab('screen-plan');saveLiveMatch();}}
 
 async function generatePlan(){
   matchLengthMins=gn('matchLength');
@@ -1312,7 +1321,7 @@ function updateScoreDisplay(){
   const hdr=$('scoreHdr');hdr.textContent=scoreHome+' - '+scoreAway;hdr.style.display='';
   renderGoalLog();
 }
-function goal(team,delta){if(team==='home')scoreHome=Math.max(0,scoreHome+delta);else scoreAway=Math.max(0,scoreAway+delta);updateScoreDisplay();}
+function goal(team,delta){if(team==='home')scoreHome=Math.max(0,scoreHome+delta);else scoreAway=Math.max(0,scoreAway+delta);updateScoreDisplay();saveLiveMatch();}
 function removeLastGoal(team){var t=team||'home';var idx=-1;for(var i=goalLog.length-1;i>=0;i--){if(goalLog[i].team===t){idx=i;break;}}if(idx!==-1)goalLog.splice(idx,1);if(t==='home')scoreHome=Math.max(0,scoreHome-1);else scoreAway=Math.max(0,scoreAway-1);updateScoreDisplay();}
 function openGoalModal(){
   $('goalMinute').value=Math.floor(elapsedSeconds/60)||'';
@@ -1328,7 +1337,7 @@ function confirmGoal(){
   const assist=$('goalAssist').value;
   goalLog.push({min:min,scorer:scorer,assist:assist||null,team:'home'});
   goalLog.sort(function(a,b){return a.min-b.min;});
-  scoreHome++;updateScoreDisplay();closeModal(null,'modal-goal');
+  scoreHome++;updateScoreDisplay();closeModal(null,'modal-goal');saveLiveMatch();
 }
 function renderGoalLog(){
   var allGoals=goalLog.filter(function(g){return g.team==='home'||g.team==='away';});
@@ -1348,14 +1357,14 @@ function renderGoalLog(){
 function deleteGoal(idx){const g=goalLog[idx];if(!g)return;goalLog.splice(idx,1);if(g.team==='home')scoreHome=Math.max(0,scoreHome-1);else scoreAway=Math.max(0,scoreAway-1);updateScoreDisplay();}
 
 /* MATCH TIMER */
-function startMatch(){if(timerInterval)return;if(!planGenerated){showTab('screen-setup');showAlert('Generate a plan first');return;}matchStartWallTime=Date.now();matchStartElapsed=elapsedSeconds;timerInterval=setInterval(tickTimer,500);$('btnStart').textContent='Running...';document.addEventListener('visibilitychange',onVisibilityChange);}
-function pauseMatch(){clearInterval(timerInterval);timerInterval=null;$('btnStart').textContent='Start';document.removeEventListener('visibilitychange',onVisibilityChange);matchStartElapsed=elapsedSeconds;matchStartWallTime=null;}
+function startMatch(){if(timerInterval)return;if(!planGenerated){showTab('screen-setup');showAlert('Generate a plan first');return;}matchStartWallTime=Date.now();matchStartElapsed=elapsedSeconds;timerInterval=setInterval(tickTimer,500);$('btnStart').textContent='Running...';document.addEventListener('visibilitychange',onVisibilityChange);saveLiveMatch();}
+function pauseMatch(){clearInterval(timerInterval);timerInterval=null;$('btnStart').textContent='Start';document.removeEventListener('visibilitychange',onVisibilityChange);matchStartElapsed=elapsedSeconds;matchStartWallTime=null;saveLiveMatch();}
 function onVisibilityChange(){if(document.visibilityState==='visible'&&timerInterval&&matchStartWallTime){elapsedSeconds=Math.floor((Date.now()-matchStartWallTime)/1000)+matchStartElapsed;if(blocks.length){const em=elapsedSeconds/60;while(currentBlockIdx<blocks.length-1&&em>=blocks[currentBlockIdx+1].subAt)advanceBlock();}updateClockDisplay();updateNextChangeBar();}}
-function resetMatch(){pauseMatch();elapsedSeconds=0;matchStartElapsed=0;matchStartWallTime=null;currentBlockIdx=0;scoreHome=0;scoreAway=0;goalLog=[];$('clock').textContent='00:00';$('halfLabel').textContent='PRE-MATCH';$('progressFill').style.width='0%';$('scoreHome').textContent='0';$('scoreAway').textContent='0';const hdr=$('scoreHdr');if(hdr){hdr.textContent='0 - 0';hdr.style.display='none';}$('goalLogWrap').style.display='none';if(blocks.length)drawPitch('liveWrap',blocks[0].lineup,blocks[0].activeGK,null);updateNextChangeBar();renderSubList();}
+function resetMatch(){pauseMatch();elapsedSeconds=0;matchStartElapsed=0;matchStartWallTime=null;currentBlockIdx=0;scoreHome=0;scoreAway=0;goalLog=[];clearLiveMatch();$('clock').textContent='00:00';$('halfLabel').textContent='PRE-MATCH';$('progressFill').style.width='0%';$('scoreHome').textContent='0';$('scoreAway').textContent='0';const hdr=$('scoreHdr');if(hdr){hdr.textContent='0 - 0';hdr.style.display='none';}$('goalLogWrap').style.display='none';if(blocks.length)drawPitch('liveWrap',blocks[0].lineup,blocks[0].activeGK,null);updateNextChangeBar();renderSubList();}
 function updateClockDisplay(){const m=Math.floor(elapsedSeconds/60).toString().padStart(2,'0');const s=(elapsedSeconds%60).toString().padStart(2,'0');$('clock').textContent=m+':'+s;}
 function tickTimer(){if(matchStartWallTime)elapsedSeconds=Math.floor((Date.now()-matchStartWallTime)/1000)+matchStartElapsed;else elapsedSeconds++;updateClockDisplay();const em=elapsedSeconds/60;$('progressFill').style.width=Math.min(100,em/matchLengthMins*100)+'%';if(em>=matchLengthMins){$('halfLabel').textContent='FULL TIME';pauseMatch();return;}$('halfLabel').textContent=em<matchLengthMins/2?'FIRST HALF':'SECOND HALF';if(currentBlockIdx<blocks.length-1&&em>=blocks[currentBlockIdx+1].subAt)advanceBlock();updateNextChangeBar();if(gc('alertMode')){const next=blocks.slice(1).find(function(b){return b.subAt>em+0.05;});if(next&&Math.abs(next.subAt-em-1)<0.016)triggerAlert();}}
 function triggerAlert(){if(navigator.vibrate)navigator.vibrate([200,100,200]);try{const ctx=new(window.AudioContext||window.webkitAudioContext)();const o=ctx.createOscillator();const g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.value=880;g.gain.setValueAtTime(.3,ctx.currentTime);g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.4);o.start();o.stop(ctx.currentTime+.4);}catch(e){}}
-function advanceBlock(){const prev=blocks[currentBlockIdx];currentBlockIdx=Math.min(currentBlockIdx+1,blocks.length-1);const blk=blocks[currentBlockIdx];drawPitch('liveWrap',blk.lineup,blk.activeGK,prev.lineup);renderSubList();}
+function advanceBlock(){const prev=blocks[currentBlockIdx];currentBlockIdx=Math.min(currentBlockIdx+1,blocks.length-1);const blk=blocks[currentBlockIdx];drawPitch('liveWrap',blk.lineup,blk.activeGK,prev.lineup);renderSubList();saveLiveMatch();}
 function forceNextBlock(){if(!planGenerated){showAlert('Generate a plan first');return;}advanceBlock();}
 function updateNextChangeBar(){if(!blocks.length)return;const em=elapsedSeconds/60;const next=blocks.slice(1).find(function(b){return b.subAt>em+0.05;});if(next){const ml=Math.ceil(next.subAt-em);$('nextChangeValue').textContent=next.subAt+'\' (in ~'+ml+' min'+(ml!==1?'s':'')+')';}else $('nextChangeValue').textContent='No more changes';}
 
@@ -1708,6 +1717,7 @@ async function saveSeasonStats(){
     lineups: lineups
   });
   await saveHistory(history);
+  await clearLiveMatch();
   showAlert('Match saved!','success');
   buildSeasonStats();
 }
@@ -2018,7 +2028,274 @@ async function deleteMatchFromHistory(){
 }
 
 function openOppGoalModal(){$('oppGoalMinute').value=Math.floor(elapsedSeconds/60)||'';$('modal-opp-goal').classList.add('open');}
-function confirmOppGoal(){var min=parseInt($('oppGoalMinute').value)||Math.floor(elapsedSeconds/60)||1;goalLog.push({min:min,scorer:null,assist:null,team:'away'});goalLog.sort(function(a,b){return a.min-b.min;});scoreAway++;updateScoreDisplay();closeModal(null,'modal-opp-goal');}
+function confirmOppGoal(){var min=parseInt($('oppGoalMinute').value)||Math.floor(elapsedSeconds/60)||1;goalLog.push({min:min,scorer:null,assist:null,team:'away'});goalLog.sort(function(a,b){return a.min-b.min;});scoreAway++;updateScoreDisplay();closeModal(null,'modal-opp-goal');saveLiveMatch();}
+
+/* ── LIVE MATCH CLOUD SYNC ──────────────────────────────────────────────
+   The head coach generates the plan and runs the match timer.
+   All other coaches connected to the same team code see the live
+   match state (current lineup, score, subs, goal log) update in real
+   time via the Firestore onSnapshot listener already wired up in
+   startTeamSync(). No extra polling needed.
+──────────────────────────────────────────────────────────────────────── */
+
+// Serialise the blocks array into a Firestore-safe shape.
+// blocks contain player objects with circular references and functions —
+// we only need name, positions, and the role/display maps for display.
+function serializeBlocksForCloud(blks){
+  return blks.map(function(blk){
+    return {
+      subAt: blk.subAt,
+      dur: blk.dur,
+      lineup: blk.lineup.map(function(p){return p.name;}),
+      activeGK: blk.activeGK.name,
+      roleMap: blk.roleMap ? (function(){
+        var m={};
+        Object.keys(blk.roleMap).forEach(function(k){m[k]=blk.roleMap[k];});
+        return m;
+      }()) : {},
+      displayMap: blk.displayMap ? (function(){
+        var m={};
+        Object.keys(blk.displayMap).forEach(function(k){m[k]=blk.displayMap[k];});
+        return m;
+      }()) : {},
+      subs: (blk.subs||[]).map(function(s){
+        return {off:s.off?s.off.name:null, on:s.on?s.on.name:null};
+      })
+    };
+  });
+}
+
+async function saveLiveMatch(){
+  if(!CURRENT_TEAM_CODE||!planGenerated||!blocks.length) return;
+  try{
+    const payload={
+      liveMatch:{
+        active: true,
+        generatedAt: Date.now(),
+        formation: currentFormation,
+        matchLengthMins: matchLengthMins,
+        gk1: gv('gk1'),
+        gk2: gv('gk2'),
+        currentBlockIdx: currentBlockIdx,
+        scoreUs: scoreHome,
+        scoreThem: scoreAway,
+        goalLog: goalLog.map(function(g){return {min:g.min,scorer:g.scorer,assist:g.assist,team:g.team};}),
+        blocks: serializeBlocksForCloud(blocks),
+        playerNames: playersData.map(function(p){return p.name;}),
+        // Timer state — stored as wall time so any device can reconstruct
+        // elapsed time without needing the ticker to be running locally.
+        timerRunning: timerInterval!==null,
+        matchStartWallTime: matchStartWallTime||null,
+        matchStartElapsed: matchStartElapsed||0
+      }
+    };
+    await cloudSaveTeamDoc(CURRENT_TEAM_CODE, payload);
+  }catch(e){ console.error('saveLiveMatch failed',e); }
+}
+
+async function clearLiveMatch(){
+  if(!CURRENT_TEAM_CODE) return;
+  try{
+    await cloudSaveTeamDoc(CURRENT_TEAM_CODE,{liveMatch:{active:false}});
+  }catch(e){ console.error('clearLiveMatch failed',e); }
+}
+
+// Called by the realtime snapshot handler when any coach updates the team doc.
+// ALL coaches sync from this — any device can take over match management.
+function syncLiveMatchFromCloud(teamData){
+  var lm = teamData && teamData.liveMatch;
+  var banner = document.getElementById('liveMatchBanner');
+
+  if(!lm || !lm.active || !lm.blocks || !lm.blocks.length) {
+    if(banner) banner.style.display = 'none';
+    return;
+  }
+
+  // Rebuild full match state from cloud data.
+  // This runs on EVERY device including the one that last wrote,
+  // but we skip it if our local state is already identical (avoids
+  // re-rendering our own writes back to ourselves).
+  var localIdx = planGenerated ? currentBlockIdx : -1;
+  var cloudIdx = lm.currentBlockIdx||0;
+
+  // Always update score/goals (could have changed on another device)
+  if(scoreHome !== lm.scoreUs || scoreAway !== lm.scoreThem){
+    scoreHome = lm.scoreUs||0;
+    scoreAway = lm.scoreThem||0;
+    goalLog = (lm.goalLog||[]).map(function(g){return {min:g.min,scorer:g.scorer,assist:g.assist,team:g.team};});
+    updateScoreDisplay();
+    renderGoalLog();
+  }
+
+  // Rebuild plan if we don't have it or block has changed on another device
+  var needRebuild = !planGenerated || (cloudIdx !== localIdx && cloudIdx >= 0);
+
+  if(needRebuild){
+    // Restore plan state from the serialised cloud blocks
+    // We need playersData as objects so the pitch/table renderers work.
+    // Build minimal player objects from the cloud block data.
+    var nameSet = {};
+    (lm.blocks||[]).forEach(function(blk){
+      (blk.lineup||[]).forEach(function(n){nameSet[n]=true;});
+    });
+    // Load full positions from saved squad (async — fire and forget, then re-render)
+    restoreMatchFromCloud(lm);
+  }
+
+  // Update the live match banner
+  showLiveMatchView(lm);
+}
+
+// Restore full match state from cloud liveMatch data — async because it
+// needs to read squad data to rebuild player objects with positions.
+async function restoreMatchFromCloud(lm){
+  try{
+    // Rebuild playersData from saved squad so positions are available
+    var allSquads = await loadAllSquads();
+    var squad = allSquads[0]||[];  // default to first squad
+    var playerMap = {};
+    squad.forEach(function(p){ if(p.name) playerMap[p.name]=p; });
+
+    // Build player objects for everyone in the cloud blocks
+    var nameSet = {};
+    (lm.blocks||[]).forEach(function(blk){
+      (blk.lineup||[]).forEach(function(n){ nameSet[n]=true; });
+    });
+
+    playersData = Object.keys(nameSet).map(function(name){
+      var sq = playerMap[name]||{};
+      return {
+        name: name,
+        positions: {def:!!(sq.def),midc:!!(sq.midc),midw:!!(sq.midw),att:!!(sq.att)},
+        outfieldMins: 0, totalMins: 0,
+        seasonFairMins: 0, seasonDebt: 0, lastStartedSub: false
+      };
+    });
+
+    // Rebuild blocks array from the serialised cloud format
+    function findPlayer(name){ return playersData.find(function(p){return p.name===name;})||{name:name,positions:{},outfieldMins:0}; }
+
+    blocks = (lm.blocks||[]).map(function(blk){
+      var lineup = (blk.lineup||[]).map(findPlayer);
+      var activeGK = findPlayer(blk.activeGK);
+      return {
+        subAt: blk.subAt,
+        dur: blk.dur,
+        lineup: lineup,
+        activeGK: activeGK,
+        subs: (blk.subs||[]).map(function(s){return {off:findPlayer(s.off),on:findPlayer(s.on)};}),
+        roleMap: blk.roleMap||{},
+        displayMap: blk.displayMap||{}
+      };
+    });
+
+    currentFormation = lm.formation||'2-3-1';
+    matchLengthMins  = lm.matchLengthMins||50;
+    currentBlockIdx  = Math.min(lm.currentBlockIdx||0, blocks.length-1);
+    planGenerated    = true;
+
+    // Restore timer state — calculate where we are from stored wall time
+    if(lm.timerRunning && lm.matchStartWallTime){
+      // Match is running — compute elapsed from when it started
+      var elapsed = Math.floor((Date.now() - lm.matchStartWallTime)/1000) + (lm.matchStartElapsed||0);
+      elapsedSeconds = elapsed;
+      matchStartWallTime = lm.matchStartWallTime;
+      matchStartElapsed  = lm.matchStartElapsed||0;
+      // Start local timer if not already running
+      if(!timerInterval){
+        timerInterval = setInterval(tickTimer, 500);
+        var btn = $('btnStart');
+        if(btn) btn.textContent = 'Running...';
+        document.addEventListener('visibilitychange', onVisibilityChange);
+      }
+    } else if(!lm.timerRunning){
+      // Match is paused — restore elapsed time
+      if(timerInterval){ clearInterval(timerInterval); timerInterval=null; }
+      elapsedSeconds    = lm.matchStartElapsed||0;
+      matchStartElapsed = lm.matchStartElapsed||0;
+      matchStartWallTime = null;
+      var btn = $('btnStart');
+      if(btn) btn.textContent = 'Start';
+    }
+
+    // Re-render match screen with restored state
+    renderPlanTable();
+    renderMinutesTable();
+    if(blocks[currentBlockIdx]){
+      drawPitch('pitchWrap', blocks[0].lineup, blocks[0].activeGK, null);
+      drawPitch('liveWrap', blocks[currentBlockIdx].lineup, blocks[currentBlockIdx].activeGK, currentBlockIdx>0?blocks[currentBlockIdx-1].lineup:null);
+    }
+    renderSubList();
+    updateClockDisplay();
+    updateNextChangeBar();
+    showLiveMatchView(lm);
+
+  }catch(e){ console.error('restoreMatchFromCloud failed', e); }
+}
+
+function showLiveMatchView(lm){
+  var banner = document.getElementById('liveMatchBanner');
+  if(!banner) return;
+  banner.style.display = '';
+
+  var blk = lm.blocks[lm.currentBlockIdx] || lm.blocks[0];
+  var roles = FORMATION6[lm.formation]||['def','def','midc','midw','att','att'];
+  var rl = {'def':'DEF','midc':'MID-C','midw':'MID-W','att':'ATT'};
+
+  // Position-labelled lineup
+  var dm = blk.displayMap || blk.roleMap || {};
+  var lineupStr = [blk.activeGK+'[GK]'].concat(
+    blk.lineup.filter(function(n){return n!==blk.activeGK;}).map(function(n){
+      var ri=dm[n]; var pos=(ri!=null&&ri>=0)?(rl[roles[ri]]||roles[ri]):'?';
+      return n+'['+pos+']';
+    })
+  ).join(', ');
+
+  // Sub details for this block
+  var subsHtml='';
+  if(lm.currentBlockIdx>0&&blk.subs&&blk.subs.length){
+    var isHalf=Math.abs(blk.subAt-lm.matchLengthMins/2)<0.5;
+    subsHtml='<div style="font-size:12px;color:var(--muted);margin-top:8px">'
+      +(isHalf?'<strong style="color:var(--amber)">HALF TIME</strong> ':'<strong>'+blk.subAt+"'</strong> ")
+      +blk.subs.map(function(s){
+        return '<span style="color:var(--red)">OUT '+s.off+'</span> &rarr; <span style="color:var(--green)">IN '+s.on+'</span>';
+      }).join(' &nbsp; ')+'</div>';
+  }
+
+  // Goal log
+  var goalsHtml='';
+  if(lm.goalLog&&lm.goalLog.length){
+    goalsHtml='<div style="font-size:12px;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">'
+      +lm.goalLog.map(function(g){
+        return g.team==='home'
+          ?'<span style="color:var(--green)">&#9917; '+g.min+"' "+g.scorer+(g.assist?' ('+g.assist+')':'')+'</span>'
+          :'<span style="color:var(--red)">&#9917; '+g.min+"' Opp</span>";
+      }).join(' &nbsp; ')+'</div>';
+  }
+
+  var scoreStr = (lm.scoreUs||0)+' &ndash; '+(lm.scoreThem||0);
+  var timeStr  = lm.currentBlockIdx===0?'Kickoff':
+    (Math.abs(blk.subAt-lm.matchLengthMins/2)<0.5?'Half Time':blk.subAt+"'");
+  var isRunning = lm.timerRunning;
+  var hasMore   = lm.currentBlockIdx < lm.blocks.length-1;
+
+  banner.innerHTML =
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+      +'<div style="font-weight:800;font-size:16px;color:var(--amber)">&#9679; LIVE</div>'
+      +'<div style="font-weight:800;font-size:22px">'+scoreStr+'</div>'
+      +'<div style="font-size:12px;color:var(--muted)">'+timeStr+' &middot; '+lm.formation+'</div>'
+    +'</div>'
+    +'<div style="font-size:13px;line-height:1.7;margin-bottom:8px">'+lineupStr+'</div>'
+    +subsHtml+goalsHtml
+    +'<div class="btn-row" style="margin-top:12px;gap:8px">'
+      +(isRunning
+        ?'<button class="btn btn-secondary btn-sm" style="flex:1" onclick="pauseMatch()">Pause</button>'
+        :'<button class="btn btn-primary btn-sm" style="flex:1" onclick="startMatch()">Start</button>')
+      +(hasMore?'<button class="btn btn-secondary btn-sm" style="flex:1" onclick="advanceBlock()">Next Sub</button>':'')
+      +'<button class="btn btn-secondary btn-sm" style="flex:1" onclick="showTab(\'screen-match\')">Full View</button>'
+    +'</div>';
+}
+
 /* INIT — called once the team gate is dismissed (team joined/created, or offline mode chosen) */
 async function initAppAfterGate(){
   const badge=$('teamCodeBadge');
