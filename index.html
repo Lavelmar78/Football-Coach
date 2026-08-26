@@ -981,7 +981,7 @@ async function generatePlan(){
      This completely separates equal-time (Phase 1) from positional (Phase 2),
      giving near-perfect minute equality regardless of role distribution.       */
 
-  playersData.forEach(function(p){p.outfieldMins=0;p.totalMins=0;});
+  playersData.forEach(function(p){p.outfieldMins=0;p.totalMins=0;p.benchMinsThisMatch=0;});
   blocks=[];
 
   for(let si=0;si<segments.length;si++){
@@ -999,12 +999,23 @@ async function generatePlan(){
 
     // Phase 1: pick lowest-time players.
     // Sort by combined total: this-match outfield mins + season fair mins.
-    // Players who started on the bench last match get a half-segment boost
-    // so they are prioritised into the starting lineup this match.
+    // TWO priority boosts applied:
+    //
+    // Boost A — bench cap: once a player has already sat out a segment this
+    // match, give them a very large boost so they come back on before anyone
+    // who hasn't had their bench turn yet. This prevents the same player
+    // sitting out two consecutive segments while fresh players stay on.
+    // The boost size (999) is larger than any possible season debt difference,
+    // so a "had bench time" player always beats a "never sat out" player.
+    //
+    // Boost B — lastStartedSub: players who started on bench LAST match get
+    // a half-segment boost so they tend to start this match.
     const subBoost=seg.dur*0.5;
     const poolSorted=poolAvail.slice().sort(function(a,b){
-      const sa=(a.outfieldMins+(a.seasonFairMins||0))-(a.lastStartedSub?subBoost:0);
-      const sb=(b.outfieldMins+(b.seasonFairMins||0))-(b.lastStartedSub?subBoost:0);
+      const benchBoostA = a.benchMinsThisMatch>0 ? 999 : 0;
+      const benchBoostB = b.benchMinsThisMatch>0 ? 999 : 0;
+      const sa=(a.outfieldMins+(a.seasonFairMins||0))-(benchBoostA)-(a.lastStartedSub?subBoost:0);
+      const sb=(b.outfieldMins+(b.seasonFairMins||0))-(benchBoostB)-(b.lastStartedSub?subBoost:0);
       return sa-sb;
     });
     const chosen=poolSorted.slice(0,roles.length);
@@ -1053,6 +1064,10 @@ async function generatePlan(){
     // Accrue minutes
     lineup.forEach(function(p){p.totalMins+=seg.dur;});
     lineup.forEach(function(p){if(p!==activeGK)p.outfieldMins+=seg.dur;});
+    // Track bench time this match for the per-match bench cap
+    poolAvail.forEach(function(p){
+      if(!chosen.includes(p)) p.benchMinsThisMatch=(p.benchMinsThisMatch||0)+seg.dur;
+    });
     blocks.push({subAt:seg.subAt,end:seg.end,dur:seg.dur,lineup:lineup.slice(),activeGK:activeGK});
   }
 
