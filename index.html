@@ -1225,7 +1225,7 @@ async function generatePlan(){
   planGenerated=true;currentBlockIdx=0;
   renderPlanTable();renderMinutesTable();
   drawPitch('pitchWrap',blocks[0].lineup,blocks[0].activeGK,null,blocks[0].displayMap,true);
-  drawPitch('liveWrap',blocks[0].lineup,blocks[0].activeGK,null);
+  drawPitch('liveWrap',blocks[0].lineup,blocks[0].activeGK,null,blocks[0].displayMap,false);
   renderSubList();updateNextChangeBar();
   return null;
 }
@@ -1328,17 +1328,19 @@ function redrawKickoffPitch(showSelection){
   if(!blk0) return;
   var dm=blk0.displayMap||{};
   drawPitch('pitchWrap',blk0.lineup,blk0.activeGK,null,dm,true);
+  // Also sync the live lineup pitch if we're still on block 0
+  if(currentBlockIdx===0){
+    drawPitch('liveWrap',blk0.lineup,blk0.activeGK,null,dm,false);
+  }
   // Re-highlight selected token if needed
   if(showSelection&&swapSelectedIdx!==null){
     var wrap=$('pitchWrap');
     if(!wrap) return;
     var tokens=wrap.querySelectorAll('.pitch-token:not(.gk)');
-    // Find which token matches swapSelectedIdx via position
     var blk=blocks[0];
     var outfield=blk.lineup.filter(function(p){return p!==blk.activeGK;});
-    var coords=FORMATION_COORDS[currentFormation]||PITCH_COORDS_DEFAULT;
     outfield.forEach(function(p){
-      if((dm[p.name]===swapSelectedIdx)||(swapSelectedIdx>=0&&!Object.keys(dm).length)){
+      if(dm[p.name]===swapSelectedIdx||(swapSelectedIdx>=0&&!Object.keys(dm).length)){
         tokens.forEach(function(tok){
           if(tok.title===p.name) tok.classList.add('selected');
         });
@@ -1469,11 +1471,11 @@ function deleteGoal(idx){const g=goalLog[idx];if(!g)return;goalLog.splice(idx,1)
 function startMatch(){if(timerInterval)return;if(!planGenerated){showTab('screen-setup');showAlert('Generate a plan first');return;}matchStartWallTime=Date.now();matchStartElapsed=elapsedSeconds;timerInterval=setInterval(tickTimer,500);$('btnStart').textContent='Running...';document.addEventListener('visibilitychange',onVisibilityChange);saveLiveMatch();var sh=$('swapHint');if(sh)sh.style.display='none';}
 function pauseMatch(){clearInterval(timerInterval);timerInterval=null;$('btnStart').textContent='Start';document.removeEventListener('visibilitychange',onVisibilityChange);matchStartElapsed=elapsedSeconds;matchStartWallTime=null;saveLiveMatch();}
 function onVisibilityChange(){if(document.visibilityState==='visible'&&timerInterval&&matchStartWallTime){elapsedSeconds=Math.floor((Date.now()-matchStartWallTime)/1000)+matchStartElapsed;if(blocks.length){const em=elapsedSeconds/60;while(currentBlockIdx<blocks.length-1&&em>=blocks[currentBlockIdx+1].subAt)advanceBlock();}updateClockDisplay();updateNextChangeBar();}}
-function resetMatch(){pauseMatch();elapsedSeconds=0;matchStartElapsed=0;matchStartWallTime=null;currentBlockIdx=0;scoreHome=0;scoreAway=0;goalLog=[];clearLiveMatch();$('clock').textContent='00:00';$('halfLabel').textContent='PRE-MATCH';$('progressFill').style.width='0%';$('scoreHome').textContent='0';$('scoreAway').textContent='0';const hdr=$('scoreHdr');if(hdr){hdr.textContent='0 - 0';hdr.style.display='none';}$('goalLogWrap').style.display='none';if(blocks.length)drawPitch('liveWrap',blocks[0].lineup,blocks[0].activeGK,null);updateNextChangeBar();renderSubList();}
+function resetMatch(){pauseMatch();elapsedSeconds=0;matchStartElapsed=0;matchStartWallTime=null;currentBlockIdx=0;scoreHome=0;scoreAway=0;goalLog=[];clearLiveMatch();$('clock').textContent='00:00';$('halfLabel').textContent='PRE-MATCH';$('progressFill').style.width='0%';$('scoreHome').textContent='0';$('scoreAway').textContent='0';const hdr=$('scoreHdr');if(hdr){hdr.textContent='0 - 0';hdr.style.display='none';}$('goalLogWrap').style.display='none';if(blocks.length)drawPitch('liveWrap',blocks[0].lineup,blocks[0].activeGK,null,blocks[0].displayMap,false);updateNextChangeBar();renderSubList();}
 function updateClockDisplay(){const m=Math.floor(elapsedSeconds/60).toString().padStart(2,'0');const s=(elapsedSeconds%60).toString().padStart(2,'0');$('clock').textContent=m+':'+s;}
 function tickTimer(){if(matchStartWallTime)elapsedSeconds=Math.floor((Date.now()-matchStartWallTime)/1000)+matchStartElapsed;else elapsedSeconds++;updateClockDisplay();const em=elapsedSeconds/60;$('progressFill').style.width=Math.min(100,em/matchLengthMins*100)+'%';if(em>=matchLengthMins){$('halfLabel').textContent='FULL TIME';pauseMatch();return;}$('halfLabel').textContent=em<matchLengthMins/2?'FIRST HALF':'SECOND HALF';if(currentBlockIdx<blocks.length-1&&em>=blocks[currentBlockIdx+1].subAt)advanceBlock();updateNextChangeBar();if(gc('alertMode')){const next=blocks.slice(1).find(function(b){return b.subAt>em+0.05;});if(next&&Math.abs(next.subAt-em-1)<0.016)triggerAlert();}}
 function triggerAlert(){if(navigator.vibrate)navigator.vibrate([200,100,200]);try{const ctx=new(window.AudioContext||window.webkitAudioContext)();const o=ctx.createOscillator();const g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.value=880;g.gain.setValueAtTime(.3,ctx.currentTime);g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.4);o.start();o.stop(ctx.currentTime+.4);}catch(e){}}
-function advanceBlock(){const prev=blocks[currentBlockIdx];currentBlockIdx=Math.min(currentBlockIdx+1,blocks.length-1);const blk=blocks[currentBlockIdx];drawPitch('liveWrap',blk.lineup,blk.activeGK,prev.lineup);renderSubList();saveLiveMatch();}
+function advanceBlock(){const prev=blocks[currentBlockIdx];currentBlockIdx=Math.min(currentBlockIdx+1,blocks.length-1);const blk=blocks[currentBlockIdx];drawPitch('liveWrap',blk.lineup,blk.activeGK,prev.lineup,blk.displayMap,false);renderSubList();saveLiveMatch();}
 function forceNextBlock(){if(!planGenerated){showAlert('Generate a plan first');return;}advanceBlock();}
 function updateNextChangeBar(){if(!blocks.length)return;const em=elapsedSeconds/60;const next=blocks.slice(1).find(function(b){return b.subAt>em+0.05;});if(next){const ml=Math.ceil(next.subAt-em);$('nextChangeValue').textContent=next.subAt+'\' (in ~'+ml+' min'+(ml!==1?'s':'')+')';}else $('nextChangeValue').textContent='No more changes';}
 
