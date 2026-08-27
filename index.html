@@ -997,17 +997,16 @@ async function generatePlan(){
     const inFirst=seg.end<=half+0.01;
     const activeGK=inFirst?gk1:gk2, offGK=inFirst?gk2:gk1;
     const gkPlays=inFirst?gk2OutSegs[seg.subAt]:gk1OutSegs[seg.subAt];
-    // Use formRoles6 always — the off-duty GK fills the 7th outfield slot
-    // guaranteed (added to lineup separately below). The pool of pure outfield
-    // players always competes for 6 slots regardless of gkFull mode.
-    // Previously formRoles5 was used when gkFull which gave only 5 slots for
-    // 8 players (3 bench/seg) instead of 6 slots (2 bench/seg), causing the
-    // large per-match spread seen in the screenshots.
-    const roles=formRoles6;
+    // 7-a-side: 1 GK in goal + 6 outfield on pitch.
+    // When gkFull and offGK plays their outfield half, they fill 1 of those 6
+    // slots guaranteed (added to lineup separately). The remaining 5 slots go
+    // to pure outfield players (formRoles5), giving 8 players for 5 slots =
+    // 3 bench per segment — the correct structural minimum for this squad size.
+    // When gkFull is OFF, all 6 outfield slots come from the pool (formRoles6).
+    const roles=gkPlays?formRoles5:formRoles6;
 
-    // Build pool: allNonGK minus the active (in-goal) GK.
-    // offGK is NOT in the pool — they are guaranteed the 7th slot separately.
-    // This keeps pool = 8 pure outfield for 6 slots = 2 bench per segment.
+    // Build pool: allNonGK minus activeGK and offGK.
+    // offGK is guaranteed their slot and added to lineup separately below.
     const excluded={};
     excluded[activeGK.name]=true;
     if(gkPlays) excluded[offGK.name]=true;
