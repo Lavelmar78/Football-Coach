@@ -997,19 +997,20 @@ async function generatePlan(){
     const inFirst=seg.end<=half+0.01;
     const activeGK=inFirst?gk1:gk2, offGK=inFirst?gk2:gk1;
     const gkPlays=inFirst?gk2OutSegs[seg.subAt]:gk1OutSegs[seg.subAt];
-    // Always use formRoles6 (6 outfield slots) regardless of gkFull mode.
-    // When the off-duty GK plays their outfield half, they compete for one
-    // of those 6 slots alongside the other outfield players rather than
-    // triggering a 5-role formation. This keeps the pool at 8 players for
-    // 6 slots (2 bench per segment) giving the correct 12' spread.
-    // The GK gets priority via their benchMinsThisMatch boost since they
-    // sat out the entire first half (in goal) before their outfield turn.
+    // Use formRoles6 always — the off-duty GK fills the 7th outfield slot
+    // guaranteed (added to lineup separately below). The pool of pure outfield
+    // players always competes for 6 slots regardless of gkFull mode.
+    // Previously formRoles5 was used when gkFull which gave only 5 slots for
+    // 8 players (3 bench/seg) instead of 6 slots (2 bench/seg), causing the
+    // large per-match spread seen in the screenshots.
     const roles=formRoles6;
 
-    // Build pool: allNonGK minus the active (in-goal) GK only.
-    // Include offGK in the pool when gkFull so they compete fairly for a slot.
+    // Build pool: allNonGK minus the active (in-goal) GK.
+    // offGK is NOT in the pool — they are guaranteed the 7th slot separately.
+    // This keeps pool = 8 pure outfield for 6 slots = 2 bench per segment.
     const excluded={};
     excluded[activeGK.name]=true;
+    if(gkPlays) excluded[offGK.name]=true;
     const poolAvail=allNonGK.filter(function(p){return !excluded[p.name];});
 
     // Phase 1: pick lowest-time players.
@@ -1071,8 +1072,9 @@ async function generatePlan(){
       if(!assigned[ri]&&remaining.length) assigned[ri]=remaining.shift();
     }
 
-    // Build lineup: activeGK + assigned outfield (offGK included via pool)
+    // Build lineup: activeGK + (offGK if plays outfield this seg) + 6 assigned outfield
     const lineup=[activeGK];
+    if(gkPlays) lineup.push(offGK);
     for(let ri=0;ri<assigned.length;ri++){if(assigned[ri])lineup.push(assigned[ri]);}
 
     // Accrue minutes
