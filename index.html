@@ -982,6 +982,14 @@ async function generatePlan(){
      giving near-perfect minute equality regardless of role distribution.       */
 
   playersData.forEach(function(p){p.outfieldMins=0;p.totalMins=0;p.benchMinsThisMatch=0;});
+  // In gkFull mode, pre-credit each GK with bench time equal to their in-goal half
+  // so they get the bench cap boost (priority 999) when they enter the outfield pool.
+  // Without this they start H2/H1 outfield with benchMinsThisMatch=0 and may
+  // get bumped from the lineup in segments where other outfield players also have 0.
+  if(gkFull){
+    gk1.benchMinsThisMatch=half;  // GK1 was in goal for H1 — credit as bench time
+    gk2.benchMinsThisMatch=half;  // GK2 was in goal for H2 — credit as bench time
+  }
   blocks=[];
 
   for(let si=0;si<segments.length;si++){
@@ -989,12 +997,19 @@ async function generatePlan(){
     const inFirst=seg.end<=half+0.01;
     const activeGK=inFirst?gk1:gk2, offGK=inFirst?gk2:gk1;
     const gkPlays=inFirst?gk2OutSegs[seg.subAt]:gk1OutSegs[seg.subAt];
-    const roles=gkPlays?formRoles5:formRoles6;
+    // Always use formRoles6 (6 outfield slots) regardless of gkFull mode.
+    // When the off-duty GK plays their outfield half, they compete for one
+    // of those 6 slots alongside the other outfield players rather than
+    // triggering a 5-role formation. This keeps the pool at 8 players for
+    // 6 slots (2 bench per segment) giving the correct 12' spread.
+    // The GK gets priority via their benchMinsThisMatch boost since they
+    // sat out the entire first half (in goal) before their outfield turn.
+    const roles=formRoles6;
 
-    // Build pool: allNonGK minus activeGK (and offGK if they play outfield)
+    // Build pool: allNonGK minus the active (in-goal) GK only.
+    // Include offGK in the pool when gkFull so they compete fairly for a slot.
     const excluded={};
     excluded[activeGK.name]=true;
-    if(gkPlays) excluded[offGK.name]=true;
     const poolAvail=allNonGK.filter(function(p){return !excluded[p.name];});
 
     // Phase 1: pick lowest-time players.
@@ -1056,9 +1071,8 @@ async function generatePlan(){
       if(!assigned[ri]&&remaining.length) assigned[ri]=remaining.shift();
     }
 
-    // Build lineup: activeGK + (offGK if plays) + assigned outfield
+    // Build lineup: activeGK + assigned outfield (offGK included via pool)
     const lineup=[activeGK];
-    if(gkPlays) lineup.push(offGK);
     for(let ri=0;ri<assigned.length;ri++){if(assigned[ri])lineup.push(assigned[ri]);}
 
     // Accrue minutes
