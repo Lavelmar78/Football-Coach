@@ -140,6 +140,7 @@ select option{background:#252b33;}
 .pitch-token{position:absolute;transform:translate(-50%,-50%);background:#0d0f12;border:2px solid var(--amber);border-radius:20px;padding:4px 8px;font-family:'Barlow Condensed',-apple-system,sans-serif;font-weight:700;font-size:12px;color:var(--amber);white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis;text-align:center;transition:all .4s cubic-bezier(.34,1.56,.64,1);box-shadow:0 2px 8px rgba(0,0,0,.5);z-index:2;}
 .pitch-token.gk{background:var(--amber);color:#0d0f12;border-color:var(--amber);}
 .pitch-token.new-player{border-color:var(--green);color:var(--green);animation:popIn .4s cubic-bezier(.34,1.56,.64,1) both;}
+.pitch-token.selected{border-color:#fff;color:#fff;background:#333;box-shadow:0 0 0 3px rgba(255,255,255,.4),0 2px 8px rgba(0,0,0,.5);}
 @keyframes popIn{from{transform:translate(-50%,-50%) scale(.4);opacity:0}to{transform:translate(-50%,-50%) scale(1);opacity:1}}
 .score-row{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:16px;background:#1e2329;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:16px 20px;}
 .score-team{text-align:center;}
@@ -349,7 +350,10 @@ select option{background:#252b33;}
   </div>
   <div class="card"><div class="card-title">Rotation Plan</div><div id="planTable"></div></div>
   <div class="card"><div class="card-title">Playing Time</div><div id="minutesTable"></div></div>
-  <div class="card"><div class="card-title">Kickoff Lineup</div><div class="pitch-wrap" id="pitchWrap"></div></div>
+  <div class="card"><div class="card-title">Kickoff Lineup</div><div class="pitch-wrap" id="pitchWrap"></div>
+<div id="swapHint" style="text-align:center;font-size:12px;color:var(--muted);margin-top:6px;display:none">
+  Tap two players to swap their positions
+</div></div>
   <button class="btn btn-green" onclick="showTab('screen-match')">Go to Match Timer</button>
 </div>
 
@@ -796,7 +800,7 @@ async function autoRejoinTeam(){
 }());
 
 /* STATE */
-let playersData=[], blocks=[], currentBlockIdx=0, timerInterval=null;
+let playersData=[], blocks=[], currentBlockIdx=0, timerInterval=null, swapSelectedIdx=null;
 let elapsedSeconds=0, matchStartWallTime=null, matchStartElapsed=0;
 let matchLengthMins=50, planGenerated=false, planSummary=null;
 let scoreHome=0, scoreAway=0, goalLog=[];
@@ -936,7 +940,7 @@ function seasonFairMins(r){return r.actualMins+(r.attributedMins||0)+(r.gkFairMi
 async function attachSeasonDebt(players){const s=await loadSeason();const recs=players.map(p=>getPlayerRecord(s,p.name));const maxFair=recs.reduce(function(m,r){return Math.max(m,seasonFairMins(r));},0);players.forEach(function(p,i){p.seasonFairMins=seasonFairMins(recs[i]);p.seasonDebt=maxFair-p.seasonFairMins;p.lastStartedSub=!!(recs[i].lastStartedSub);});}
 
 /* PLAN GENERATION */
-async function onGeneratePlan(){const e=await generatePlan();if(!e){showTab('screen-plan');saveLiveMatch();}}
+async function onGeneratePlan(){const e=await generatePlan();if(!e){showTab('screen-plan');saveLiveMatch();swapSelectedIdx=null;redrawKickoffPitch(false);var sh=$('swapHint');if(sh)sh.style.display='';}}
 
 async function generatePlan(){
   matchLengthMins=gn('matchLength');
@@ -1220,7 +1224,7 @@ async function generatePlan(){
   planSummary={segsPerHalf:segsPerHalf,spread:ofM.length?Math.max.apply(null,ofM)-Math.min.apply(null,ofM):0,perPlayer:ofM.length?Math.min.apply(null,ofM):0,perPlayerMax:ofM.length?Math.max.apply(null,ofM):0,gkFull:gkFull};
   planGenerated=true;currentBlockIdx=0;
   renderPlanTable();renderMinutesTable();
-  drawPitch('pitchWrap',blocks[0].lineup,blocks[0].activeGK,null);
+  drawPitch('pitchWrap',blocks[0].lineup,blocks[0].activeGK,null,blocks[0].displayMap,true);
   drawPitch('liveWrap',blocks[0].lineup,blocks[0].activeGK,null);
   renderSubList();updateNextChangeBar();
   return null;
@@ -1229,43 +1233,118 @@ async function generatePlan(){
 /* PITCH DRAWING */
 function pitchSVG(){return '<svg class="pitch-svg" viewBox="0 0 200 260" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="200" height="260" fill="#2d6a2d"/><rect y="0" width="200" height="26" fill="#326e32" opacity=".5"/><rect y="52" width="200" height="26" fill="#326e32" opacity=".5"/><rect y="104" width="200" height="26" fill="#326e32" opacity=".5"/><rect y="156" width="200" height="26" fill="#326e32" opacity=".5"/><rect y="208" width="200" height="26" fill="#326e32" opacity=".5"/><rect x="4" y="4" width="192" height="252" rx="2" stroke="white" stroke-opacity=".25" stroke-width="1.5" fill="none"/><line x1="4" y1="130" x2="196" y2="130" stroke="white" stroke-opacity=".25" stroke-width="1"/><circle cx="100" cy="130" r="28" stroke="white" stroke-opacity=".25" stroke-width="1" fill="none"/><circle cx="100" cy="130" r="2" fill="white" fill-opacity=".4"/><rect x="50" y="4" width="100" height="44" stroke="white" stroke-opacity=".2" stroke-width="1" fill="none"/><rect x="50" y="212" width="100" height="44" stroke="white" stroke-opacity=".2" stroke-width="1" fill="none"/><rect x="74" y="4" width="52" height="20" stroke="white" stroke-opacity=".15" stroke-width="1" fill="none"/><rect x="74" y="236" width="52" height="20" stroke="white" stroke-opacity=".15" stroke-width="1" fill="none"/><circle cx="100" cy="38" r="1.5" fill="white" fill-opacity=".4"/><circle cx="100" cy="222" r="1.5" fill="white" fill-opacity=".4"/></svg>';}
 
-function drawPitch(wrapId,lineup,activeGK,prevLineup){
+function drawPitch(wrapId,lineup,activeGK,prevLineup,displayMap,allowSwap){
   const wrap=$(wrapId);if(!wrap)return;
   wrap.innerHTML=pitchSVG();
   const coords=FORMATION_COORDS[currentFormation]||PITCH_COORDS_DEFAULT;
   const roles=FORMATION6[currentFormation]||['def','def','midc','midw','att','att'];
   const outfield=lineup.filter(function(p){return p!==activeGK;});
 
-  // Scarcity-first assignment: rarest role slot filled first,
-  // specialist players (fewest roles ticked) preferred for their slot.
+  // Use provided displayMap if available, otherwise compute scarcity-first
   var placed=new Array(roles.length).fill(null);
-  var remaining=outfield.slice();
-  var slotOrd=roles.map(function(r,ri){
-    return {ri:ri,role:r,count:remaining.filter(function(p){return p.positions[r];}).length};
-  }).sort(function(a,b){return a.count!==b.count?a.count-b.count:a.ri-b.ri;});
-  slotOrd.forEach(function(s){
-    if(placed[s.ri]) return;
-    var elig=remaining.filter(function(p){return p.positions[s.role];});
-    if(!elig.length) return;
-    elig.sort(function(a,b){
-      return Object.values(a.positions).filter(Boolean).length
-           - Object.values(b.positions).filter(Boolean).length;
+  if(displayMap && Object.keys(displayMap).length){
+    outfield.forEach(function(p){
+      var ri=displayMap[p.name];
+      if(ri!=null&&ri>=0&&ri<roles.length&&!placed[ri]) placed[ri]=p;
     });
-    placed[s.ri]=elig[0]; remaining.splice(remaining.indexOf(elig[0]),1);
-  });
-  for(var ri=0;ri<roles.length;ri++){if(!placed[ri]&&remaining.length)placed[ri]=remaining.shift();}
+    // Fill any unplaced players into empty slots
+    var empty=[];for(var ri=0;ri<roles.length;ri++){if(!placed[ri])empty.push(ri);}
+    outfield.forEach(function(p){
+      if(placed.indexOf(p)===-1&&empty.length) placed[empty.shift()]=p;
+    });
+  } else {
+    var remaining=outfield.slice();
+    var slotOrd=roles.map(function(r,ri){
+      return {ri:ri,role:r,count:remaining.filter(function(p){return p.positions[r];}).length};
+    }).sort(function(a,b){return a.count!==b.count?a.count-b.count:a.ri-b.ri;});
+    slotOrd.forEach(function(s){
+      if(placed[s.ri]) return;
+      var elig=remaining.filter(function(p){return p.positions[s.role];});
+      if(!elig.length) return;
+      elig.sort(function(a,b){
+        return Object.values(a.positions).filter(Boolean).length
+             - Object.values(b.positions).filter(Boolean).length;
+      });
+      placed[s.ri]=elig[0]; remaining.splice(remaining.indexOf(elig[0]),1);
+    });
+    for(var ri=0;ri<roles.length;ri++){if(!placed[ri]&&remaining.length)placed[ri]=remaining.shift();}
+  }
 
-  var addTok=function(player,x,y,isGK){
+  var addTok=function(player,x,y,isGK,slotIdx){
     const isNew=prevLineup?!prevLineup.includes(player):false;
     const el=document.createElement('div');
     el.className='pitch-token'+(isGK?' gk':'')+(isNew?' new-player':'');
     const nm=player.name;
     el.textContent=nm.length>9?nm.split(' ').map(function(w){return w[0];}).join('').slice(0,4).toUpperCase():nm;
     el.title=nm;el.style.left=x+'%';el.style.top=y+'%';
+    // Tap-to-swap: only on the kickoff pitch (allowSwap) and only outfield players
+    if(allowSwap&&!isGK){
+      el.style.cursor='pointer';
+      el.addEventListener('click',function(){swapTap(slotIdx,wrapId,lineup,activeGK,prevLineup);});
+    }
     wrap.appendChild(el);
   };
-  addTok(activeGK,coords[0][0],coords[0][1],true);
-  placed.forEach(function(player,i){if(!player)return;var co=coords[i+1]||[50,50];addTok(player,co[0],co[1],false);});
+  addTok(activeGK,coords[0][0],coords[0][1],true,-1);
+  placed.forEach(function(player,i){
+    if(!player)return;
+    var co=coords[i+1]||[50,50];
+    addTok(player,co[0],co[1],false,i);
+  });
+}
+
+function swapTap(slotIdx,wrapId,lineup,activeGK,prevLineup){
+  if(swapSelectedIdx===null){
+    // First tap — select this player
+    swapSelectedIdx=slotIdx;
+    redrawKickoffPitch(true);
+  } else if(swapSelectedIdx===slotIdx){
+    // Tapped same player — deselect
+    swapSelectedIdx=null;
+    redrawKickoffPitch(false);
+  } else {
+    // Second tap — swap positions in block 0 displayMap
+    var blk0=blocks[0];
+    if(!blk0) return;
+    var dm=blk0.displayMap||{};
+    // Find player names at each slot
+    var outfield=blk0.lineup.filter(function(p){return p!==blk0.activeGK;});
+    var playerA=null, playerB=null;
+    outfield.forEach(function(p){if(dm[p.name]===swapSelectedIdx)playerA=p;});
+    outfield.forEach(function(p){if(dm[p.name]===slotIdx)playerB=p;});
+    if(playerA&&playerB){
+      // Swap their slots
+      dm[playerA.name]=slotIdx;
+      dm[playerB.name]=swapSelectedIdx;
+      blk0.displayMap=dm;
+      showAlert(playerA.name+' ↔ '+playerB.name+' swapped','success');
+    }
+    swapSelectedIdx=null;
+    redrawKickoffPitch(false);
+  }
+}
+
+function redrawKickoffPitch(showSelection){
+  var blk0=blocks[0];
+  if(!blk0) return;
+  var dm=blk0.displayMap||{};
+  drawPitch('pitchWrap',blk0.lineup,blk0.activeGK,null,dm,true);
+  // Re-highlight selected token if needed
+  if(showSelection&&swapSelectedIdx!==null){
+    var wrap=$('pitchWrap');
+    if(!wrap) return;
+    var tokens=wrap.querySelectorAll('.pitch-token:not(.gk)');
+    // Find which token matches swapSelectedIdx via position
+    var blk=blocks[0];
+    var outfield=blk.lineup.filter(function(p){return p!==blk.activeGK;});
+    var coords=FORMATION_COORDS[currentFormation]||PITCH_COORDS_DEFAULT;
+    outfield.forEach(function(p){
+      if((dm[p.name]===swapSelectedIdx)||(swapSelectedIdx>=0&&!Object.keys(dm).length)){
+        tokens.forEach(function(tok){
+          if(tok.title===p.name) tok.classList.add('selected');
+        });
+      }
+    });
+  }
 }
 
 /* PLAN RENDERING */
@@ -1387,7 +1466,7 @@ function renderGoalLog(){
 function deleteGoal(idx){const g=goalLog[idx];if(!g)return;goalLog.splice(idx,1);if(g.team==='home')scoreHome=Math.max(0,scoreHome-1);else scoreAway=Math.max(0,scoreAway-1);updateScoreDisplay();}
 
 /* MATCH TIMER */
-function startMatch(){if(timerInterval)return;if(!planGenerated){showTab('screen-setup');showAlert('Generate a plan first');return;}matchStartWallTime=Date.now();matchStartElapsed=elapsedSeconds;timerInterval=setInterval(tickTimer,500);$('btnStart').textContent='Running...';document.addEventListener('visibilitychange',onVisibilityChange);saveLiveMatch();}
+function startMatch(){if(timerInterval)return;if(!planGenerated){showTab('screen-setup');showAlert('Generate a plan first');return;}matchStartWallTime=Date.now();matchStartElapsed=elapsedSeconds;timerInterval=setInterval(tickTimer,500);$('btnStart').textContent='Running...';document.addEventListener('visibilitychange',onVisibilityChange);saveLiveMatch();var sh=$('swapHint');if(sh)sh.style.display='none';}
 function pauseMatch(){clearInterval(timerInterval);timerInterval=null;$('btnStart').textContent='Start';document.removeEventListener('visibilitychange',onVisibilityChange);matchStartElapsed=elapsedSeconds;matchStartWallTime=null;saveLiveMatch();}
 function onVisibilityChange(){if(document.visibilityState==='visible'&&timerInterval&&matchStartWallTime){elapsedSeconds=Math.floor((Date.now()-matchStartWallTime)/1000)+matchStartElapsed;if(blocks.length){const em=elapsedSeconds/60;while(currentBlockIdx<blocks.length-1&&em>=blocks[currentBlockIdx+1].subAt)advanceBlock();}updateClockDisplay();updateNextChangeBar();}}
 function resetMatch(){pauseMatch();elapsedSeconds=0;matchStartElapsed=0;matchStartWallTime=null;currentBlockIdx=0;scoreHome=0;scoreAway=0;goalLog=[];clearLiveMatch();$('clock').textContent='00:00';$('halfLabel').textContent='PRE-MATCH';$('progressFill').style.width='0%';$('scoreHome').textContent='0';$('scoreAway').textContent='0';const hdr=$('scoreHdr');if(hdr){hdr.textContent='0 - 0';hdr.style.display='none';}$('goalLogWrap').style.display='none';if(blocks.length)drawPitch('liveWrap',blocks[0].lineup,blocks[0].activeGK,null);updateNextChangeBar();renderSubList();}
@@ -2252,8 +2331,8 @@ async function restoreMatchFromCloud(lm){
     renderPlanTable();
     renderMinutesTable();
     if(blocks[currentBlockIdx]){
-      drawPitch('pitchWrap', blocks[0].lineup, blocks[0].activeGK, null);
-      drawPitch('liveWrap', blocks[currentBlockIdx].lineup, blocks[currentBlockIdx].activeGK, currentBlockIdx>0?blocks[currentBlockIdx-1].lineup:null);
+      drawPitch('pitchWrap', blocks[0].lineup, blocks[0].activeGK, null, blocks[0].displayMap, false);
+      drawPitch('liveWrap', blocks[currentBlockIdx].lineup, blocks[currentBlockIdx].activeGK, currentBlockIdx>0?blocks[currentBlockIdx-1].lineup:null, blocks[currentBlockIdx].displayMap, false);
     }
     renderSubList();
     updateClockDisplay();
