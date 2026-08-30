@@ -2238,8 +2238,22 @@ function syncLiveMatchFromCloud(teamData){
     renderGoalLog();
   }
 
-  // Rebuild plan if we don't have it or block has changed on another device
-  var needRebuild = !planGenerated || (cloudIdx !== localIdx && cloudIdx >= 0);
+  // Only rebuild from cloud if this device didn't generate the plan.
+  // If planGenerated=true here, this device has live playersData with real
+  // outfieldMins — overwriting it with cloud data (which has outfieldMins:0)
+  // would wipe the minutes and break saveSeasonStats.
+  var needRebuild = !planGenerated;
+
+  // If we have a local plan but another coach advanced the block, sync the index
+  // without rebuilding the full playersData.
+  if(planGenerated && cloudIdx !== localIdx && cloudIdx >= 0 && cloudIdx < blocks.length){
+    currentBlockIdx = cloudIdx;
+    var blk = blocks[currentBlockIdx];
+    drawPitch('liveWrap', blk.lineup, blk.activeGK,
+              currentBlockIdx>0?blocks[currentBlockIdx-1].lineup:null,
+              blk.displayMap, false);
+    renderSubList();
+  }
 
   if(needRebuild){
     // Restore plan state from the serialised cloud blocks
@@ -2298,6 +2312,19 @@ async function restoreMatchFromCloud(lm){
         roleMap: blk.roleMap||{},
         displayMap: blk.displayMap||{}
       };
+    });
+
+    // Calculate outfieldMins for each player from the blocks data.
+    // This ensures saveSeasonStats has correct minutes even if playersData
+    // was rebuilt from cloud (e.g. on the device that generated the plan
+    // after a Firestore snapshot triggered restoreMatchFromCloud).
+    blocks.forEach(function(blk){
+      blk.lineup.forEach(function(p){
+        if(p !== blk.activeGK){
+          p.outfieldMins = (p.outfieldMins||0) + blk.dur;
+          p.totalMins    = (p.totalMins||0)    + blk.dur;
+        }
+      });
     });
 
     currentFormation = lm.formation||'2-3-1';
