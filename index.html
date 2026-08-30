@@ -480,7 +480,7 @@ select option{background:#252b33;}
     <p style="font-size:12px;color:var(--muted);margin-bottom:12px">P=Played, M=Missed, Field=Outfield mins, GK=Goalkeeper mins, Attr=Absence credit, Fair=Total fair mins (outfield + absence credit + GK fair credit)</p>
     <div id="seasonStatsList"></div>
     <div class="btn-row" style="margin-top:14px">
-      <button class="btn btn-primary btn-sm" style="flex:1" onclick="saveSeasonStats()">Save Match</button>
+      <button class="btn btn-primary btn-sm" id="btnSaveMatch" style="flex:1" onclick="saveSeasonStats()">Save Match</button>
       <button class="btn btn-secondary btn-sm" style="flex:1" onclick="exportSeasonJSON()">Export JSON</button>
     </div>
     <div class="btn-row">
@@ -1743,6 +1743,14 @@ async function saveHistory(h){ await cloudSet('history',h); }
 
 async function saveSeasonStats(){
   if(!planGenerated){ showAlert('Generate a plan first'); return; }
+  var saveBtn=$('btnSaveMatch');
+  if(saveBtn){
+    if(saveBtn.disabled) return;
+    saveBtn.disabled=true;
+    saveBtn.textContent='Saving...';
+    saveBtn.style.opacity='0.7';
+  }
+  try{
   const season = await loadSeason();
   const count  = gn('squadCount');
   const playedMins = playersData.map(function(p){return p.outfieldMins;}).filter(function(m){return m>0;});
@@ -1831,6 +1839,12 @@ async function saveSeasonStats(){
   await clearLiveMatch();
   showAlert('Match saved!','success');
   buildSeasonStats();
+  }catch(e){
+    console.error('saveSeasonStats failed',e);
+    showAlert('Save failed — please try again');
+  }finally{
+    if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='Save Match';saveBtn.style.opacity='';}
+  }
 }
 
 async function clearSeasonStats(){
@@ -2131,11 +2145,82 @@ async function deleteMatchFromHistory(){
   var history=await loadHistory();
   var idx=history.findIndex(function(h){return h.id===matchId;});
   if(idx===-1)return;
+  var m=history[idx];
+
+  // Reverse the season stats that were applied when this match was saved.
+  var season=await loadSeason();
+  var gkFull=gc('gkMode');
+
+  // Determine who actually played (appeared in any lineup) vs who was absent
+  var playedNames={};
+  (m.lineups||[]).forEach(function(blk){
+    (blk.players||[]).forEach(function(n){playedNames[n]=true;});
+  });
+
+  // Calculate match average from playerMins (same way saveSeasonStats does)
+  var pm=m.playerMins||{};
+  var playedMinsArr=Object.values(pm).filter(function(v){return v>0;});
+  var matchAvg=playedMinsArr.length?Math.round(playedMinsArr.reduce(function(a,b){return a+b;},0)/playedMinsArr.length):0;
+
+  // GK mins per player from lineups
+  var gkMinsMap={};
+  (m.lineups||[]).forEach(function(blk){
+    if(blk.gk){gkMinsMap[blk.gk]=(gkMinsMap[blk.gk]||0)+(blk.dur||0);}
+  });
+  // If dur wasn't stored on lineups, split matchLength evenly across blocks
+  var totalGKMins=Object.values(gkMinsMap).reduce(function(a,b){return a+b;},0);
+  if(totalGKMins===0&&m.gkFirst&&m.gkSecond){
+    var half=(m.matchLength||50)/2;
+    gkMinsMap[m.gkFirst]=(gkMinsMap[m.gkFirst]||0)+half;
+    gkMinsMap[m.gkSecond]=(gkMinsMap[m.gkSecond]||0)+half;
+  }
+  var gkPlayers=new Set(Object.keys(gkMinsMap));
+
+  // Goals and assists
+  var matchGoals={},matchAssists={};
+  (m.goals||[]).forEach(function(g){
+    if(g.scorer)matchGoals[g.scorer]=(matchGoals[g.scorer]||0)+1;
+    if(g.assist)matchAssists[g.assist]=(matchAssists[g.assist]||0)+1;
+  });
+
+  // Who started on bench (not in block 0 lineup)
+  var block0names=new Set((m.lineups&&m.lineups[0]&&m.lineups[0].players)||[]);
+
+  // Reverse stats for everyone in the squad
+  var allSquads=await loadAllSquads();
+  var squad=allSquads[0]||[];
+  squad.forEach(function(sp){
+    if(!sp.name)return;
+    var r=getPlayerRecord(season,sp.name);
+    if(!playedNames[sp.name]){
+      // Was absent — reverse absence credit
+      r.matches=Math.max(0,(r.matches||0));   // absent players don't have matches incremented
+      r.missedMatches=Math.max(0,(r.missedMatches||1)-1);
+      r.attributedMins=Math.max(0,(r.attributedMins||matchAvg)-matchAvg);
+    } else {
+      r.matches=Math.max(0,(r.matches||1)-1);
+      r.gkMins=Math.max(0,(r.gkMins||0)-(gkMinsMap[sp.name]||0));
+      r.goals=Math.max(0,(r.goals||0)-(matchGoals[sp.name]||0));
+      r.assists=Math.max(0,(r.assists||0)-(matchAssists[sp.name]||0));
+      if(gkFull&&gkPlayers.has(sp.name)){
+        r.gkOutfieldMins=Math.max(0,(r.gkOutfieldMins||0)-(pm[sp.name]||0));
+        r.gkFairMins=Math.max(0,(r.gkFairMins||0)-matchAvg);
+      } else {
+        r.actualMins=Math.max(0,(r.actualMins||0)-(pm[sp.name]||0));
+      }
+      // Revert lastStartedSub — best effort, set based on block0
+      r.lastStartedSub=!block0names.has(sp.name);
+    }
+    season[sp.name]=r;
+  });
+
+  await saveSeason(season);
   history.splice(idx,1);
   await saveHistory(history);
   closeModal(null,'modal-edit-match');
   buildHistoryScreen();
-  showAlert('Match deleted','success');
+  buildSeasonStats();
+  showAlert('Match deleted and stats reversed','success');
 }
 
 function openOppGoalModal(){$('oppGoalMinute').value=Math.floor(elapsedSeconds/60)||'';$('modal-opp-goal').classList.add('open');}
