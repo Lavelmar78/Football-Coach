@@ -772,18 +772,23 @@ async function upgradeTeamCode(){
     return;
   }
   btn.disabled=true;btn.textContent='Upgrading...';
+  var step='starting';
   try{
     var fb=await fbReady();
     var oldCode=CURRENT_TEAM_CODE;
     var newCode=generateTeamCode();
+    step='checking the new code is free';
     var taken=await cloudLoadTeamDoc(newCode);
     var tries=0;
     while(taken&&tries<5){newCode=generateTeamCode();taken=await cloudLoadTeamDoc(newCode);tries++;}
+    step='reading the current team';
     var src=await cloudLoadTeamDoc(oldCode)||TEAM_DOC_CACHE;
     var keys=['teamName','squads','squad_names','season','history','createdAt'];
     var copy={};
     keys.forEach(function(k){if(src[k]!==undefined)copy[k]=src[k];});
+    step='creating the new team';
     await cloudSaveTeamDoc(newCode,copy);
+    step='verifying the copy';
     // verify the copy before touching the old doc
     var check=await cloudLoadTeamDoc(newCode);
     if(!check||JSON.stringify(check.history||[])!==JSON.stringify(copy.history||[])||JSON.stringify(check.season||{})!==JSON.stringify(copy.season||{})){
@@ -793,6 +798,7 @@ async function upgradeTeamCode(){
     var retire={retired:true};
     ['squads','squad_names','season','history','liveMatch','teamName'].forEach(function(k){retire[k]=fb.deleteField();});
     if(TEAM_UNSUB){TEAM_UNSUB();TEAM_UNSUB=null;}
+    step='retiring the old code';
     await cloudSaveTeamDoc(oldCode,retire);
     CURRENT_TEAM_CODE=newCode;
     localStorage.setItem('am_team_code',newCode);
@@ -806,7 +812,8 @@ async function upgradeTeamCode(){
     showAlert('New team code: '+newCode,'success');
   }catch(e){
     console.error('upgradeTeamCode failed',e);
-    showAlert('Upgrade failed: '+(e&&e.message?e.message:'try again'));
+    showAlert('Upgrade failed while '+step+': '+(e&&e.code?e.code:(e&&e.message?e.message:'try again')));
+    if(!TEAM_UNSUB&&CURRENT_TEAM_CODE) startTeamSync(CURRENT_TEAM_CODE);
     btn.disabled=false;btn.dataset.confirm='';btn.textContent='Get a stronger team code';
   }
 }
