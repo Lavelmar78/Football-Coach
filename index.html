@@ -802,7 +802,7 @@ async function autoRejoinTeam(){
 /* STATE */
 let playersData=[], blocks=[], currentBlockIdx=0, timerInterval=null, swapSelectedIdx=null;
 let elapsedSeconds=0, matchStartWallTime=null, matchStartElapsed=0;
-let matchLengthMins=50, planGenerated=false, planSummary=null;
+let matchLengthMins=50, planGenerated=false, planSummary=null, currentMatchKey=null;
 let scoreHome=0, scoreAway=0, goalLog=[];
 let activeSquadIdx=0, currentFormation='2-3-1';
 
@@ -940,7 +940,7 @@ function seasonFairMins(r){return r.actualMins+(r.attributedMins||0)+(r.gkFairMi
 async function attachSeasonDebt(players){const s=await loadSeason();const recs=players.map(p=>getPlayerRecord(s,p.name));const maxFair=recs.reduce(function(m,r){return Math.max(m,seasonFairMins(r));},0);players.forEach(function(p,i){p.seasonFairMins=seasonFairMins(recs[i]);p.seasonDebt=maxFair-p.seasonFairMins;p.lastStartedSub=!!(recs[i].lastStartedSub);});}
 
 /* PLAN GENERATION */
-async function onGeneratePlan(){const e=await generatePlan();if(!e){showTab('screen-plan');saveLiveMatch();swapSelectedIdx=null;redrawKickoffPitch(false);var sh=$('swapHint');if(sh)sh.style.display='';}}
+async function onGeneratePlan(){const e=await generatePlan();if(!e){currentMatchKey=Date.now();showTab('screen-plan');saveLiveMatch();swapSelectedIdx=null;redrawKickoffPitch(false);var sh=$('swapHint');if(sh)sh.style.display='';}}
 
 async function generatePlan(){
   matchLengthMins=gn('matchLength');
@@ -1317,6 +1317,7 @@ function swapTap(slotIdx,wrapId,lineup,activeGK,prevLineup){
       dm[playerB.name]=swapSelectedIdx;
       blk0.displayMap=dm;
       showAlert(playerA.name+' ↔ '+playerB.name+' swapped','success');
+      saveLiveMatch();
     }
     swapSelectedIdx=null;
     redrawKickoffPitch(false);
@@ -1751,6 +1752,11 @@ async function saveSeasonStats(){
     saveBtn.style.opacity='0.7';
   }
   try{
+  const prevHistory = await loadHistory();
+  if(currentMatchKey&&prevHistory.some(function(h){return h.matchKey===currentMatchKey;})){
+    showAlert('This match is already saved');
+    return;
+  }
   const season = await loadSeason();
   const count  = gn('squadCount');
   const playedMins = playersData.map(function(p){return p.outfieldMins;}).filter(function(m){return m>0;});
@@ -1817,11 +1823,15 @@ async function saveSeasonStats(){
     return {
       subAt: blk.subAt,
       gk: blk.activeGK.name,
+      dur: blk.dur,
       players: blk.lineup.map(function(p){return p.name;})
     };
   });
   history.push({
     id: Date.now(),
+    matchKey: currentMatchKey||null,
+    gkFull: !!gkFull,
+    matchLength: matchLengthMins,
     date: new Date().toISOString().slice(0,10),
     opponent: opponent,
     formation: currentFormation,
@@ -2149,7 +2159,7 @@ async function deleteMatchFromHistory(){
 
   // Reverse the season stats that were applied when this match was saved.
   var season=await loadSeason();
-  var gkFull=gc('gkMode');
+  var gkFull=(m.gkFull===undefined)?gc('gkMode'):m.gkFull;
 
   // Determine who actually played (appeared in any lineup) vs who was absent
   var playedNames={};
@@ -2268,6 +2278,7 @@ async function saveLiveMatch(){
       liveMatch:{
         active: true,
         generatedAt: Date.now(),
+        matchKey: currentMatchKey,
         formation: currentFormation,
         matchLengthMins: matchLengthMins,
         gk1: gv('gk1'),
@@ -2414,6 +2425,7 @@ async function restoreMatchFromCloud(lm){
 
     currentFormation = lm.formation||'2-3-1';
     matchLengthMins  = lm.matchLengthMins||50;
+    currentMatchKey  = lm.matchKey||null;
     currentBlockIdx  = Math.min(lm.currentBlockIdx||0, blocks.length-1);
     planGenerated    = true;
 
