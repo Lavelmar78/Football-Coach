@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // One document per team, found only by knowing its code.
+    match /teams/{teamCode} {
+      // Look up a team by its exact code. Listing/enumerating teams is not allowed.
+      allow get: if request.auth != null;
+      allow list: if false;
+
+      // New team: known fields only, sane code length, short team name.
+      allow create: if request.auth != null
+        && teamCode.size() >= 6 && teamCode.size() <= 20
+        && request.resource.data.keys().hasOnly([
+             'teamName','squads','squad_names','season','history',
+             'liveMatch','createdAt','retired'])
+        && (!('teamName' in request.resource.data)
+            || (request.resource.data.teamName is string
+                && request.resource.data.teamName.size() <= 60));
+
+      // Existing team: only the known fields may change.
+      allow update: if request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+             'teamName','squads','squad_names','season','history',
+             'liveMatch','createdAt','retired']);
+
+      // Teams can never be deleted from the client.
+      allow delete: if false;
+    }
+  }
+}
