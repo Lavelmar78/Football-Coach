@@ -908,6 +908,8 @@ const PITCH_COORDS_DEFAULT=[[50,88],[25,70],[75,70],[35,50],[65,50],[25,24],[75,
 
 /* UTILS */
 const $=id=>document.getElementById(id);
+/* Escape user-typed text (names, opponent, notes) before it goes into HTML. */
+function esc(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 const gv=function(id){var el=$(id);return el&&el.value!=null?String(el.value).trim():'';};
 const gn=id=>Number(gv(id))||0;
 const gc=function(id){var el=$(id);return !!(el&&el.checked);};
@@ -958,7 +960,7 @@ async function activeSquad(){const s=await loadAllSquads();return s[activeSquadI
 async function buildSquadTabs(){
   const squads=await loadAllSquads();
   const names=await loadSquadNames();
-  $('squadTabs').innerHTML=squads.map((_,i)=>'<button class="squad-tab'+(i===activeSquadIdx?' active':'')+'" onclick="switchSquad('+i+')">'+(names[i]||'Squad '+(i+1))+'</button>').join('');
+  $('squadTabs').innerHTML=squads.map((_,i)=>'<button class="squad-tab'+(i===activeSquadIdx?' active':'')+'" onclick="switchSquad('+i+')">'+esc(names[i]||'Squad '+(i+1))+'</button>').join('');
 }
 // Non-async variant for the realtime-sync callback, which already has the
 // cache populated and just needs the DOM refreshed without an extra fetch.
@@ -967,7 +969,7 @@ function buildSquadTabsSync(){
   const names=(TEAM_DOC_CACHE&&TEAM_DOC_CACHE.squad_names)||[];
   const el=$('squadTabs');
   if(!el) return;
-  el.innerHTML=squads.map((_,i)=>'<button class="squad-tab'+(i===activeSquadIdx?' active':'')+'" onclick="switchSquad('+i+')">'+(names[i]||'Squad '+(i+1))+'</button>').join('');
+  el.innerHTML=squads.map((_,i)=>'<button class="squad-tab'+(i===activeSquadIdx?' active':'')+'" onclick="switchSquad('+i+')">'+esc(names[i]||'Squad '+(i+1))+'</button>').join('');
 }
 function switchSquad(i){activeSquadIdx=i;buildSquadTabs();}
 async function newSquad(){
@@ -996,7 +998,7 @@ async function buildPlayerInputs(){
     const inj=p.injured||false;
     html+='<div class="player-row'+(inj?' injured':!avail?' unavailable':'')+'" id="prow'+i+'">'
       +'<div class="player-name-row">'
-      +'<input type="text" id="pname'+i+'" value="'+(p.name||'')+'" placeholder="Player '+(i+1)+'" oninput="refreshGKSelectors()">'
+      +'<input type="text" id="pname'+i+'" value="'+esc(p.name||'')+'" placeholder="Player '+(i+1)+'" oninput="refreshGKSelectors()">'
       +'<div style="display:flex;gap:6px">'
       +'<button class="p-btn p-btn-avail'+(avail?'':' off')+'" id="pavailbtn'+i+'" onclick="toggleAvail('+i+')" title="Available">Avail</button>'
       +'<button class="p-btn p-btn-inj'+(inj?' on':'')+'" id="pinjbtn'+i+'" onclick="toggleInj('+i+')" title="Injured">Inj</button>'
@@ -1007,7 +1009,7 @@ async function buildPlayerInputs(){
         return '<label class="role-chip'+(p[k]?' checked':'')+'"><input type="checkbox" id="p'+i+'_'+k+'"'+(p[k]?' checked':'')+' ><span>'+r+'</span></label>';
       }).join('')
       +'</div>'
-      +'<input type="text" class="player-notes" id="pnote'+i+'" value="'+(p.note||'')+'" placeholder="Notes (optional)">'
+      +'<input type="text" class="player-notes" id="pnote'+i+'" value="'+esc(p.note||'')+'" placeholder="Notes (optional)">'
       +'</div>';
   }
   $('playersContainer').innerHTML=html;
@@ -1023,7 +1025,7 @@ async function buildPlayerInputs(){
 function toggleAvail(i){const b=$('pavailbtn'+i);const r=$('prow'+i);const was=b.classList.contains('off');b.classList.toggle('off',!was);r.classList.toggle('unavailable',!was);refreshGKSelectors();updateSquadBadge();}
 function toggleInj(i){const b=$('pinjbtn'+i);const r=$('prow'+i);const was=b.classList.contains('on');b.classList.toggle('on',!was);r.classList.toggle('injured',!was);}
 function updateSquadBadge(){const c=gn('squadCount');let a=0;for(let i=0;i<c;i++){if(!($('pavailbtn'+i)&&$('pavailbtn'+i).classList.contains('off')))a++;}const el=$('squadCountBadge');if(el)el.textContent=a+' available';}
-function refreshGKSelectors(){updateSquadBadge();const c=gn('squadCount');let o='';for(let i=0;i<c;i++){if($('pavailbtn'+i)&&$('pavailbtn'+i).classList.contains('off'))continue;const n=gv('pname'+i);if(!n)continue;o+='<option value="'+n+'">'+n+'</option>';}$('gk1').innerHTML=o;$('gk2').innerHTML=o;if($('gk2').options.length>1)$('gk2').options[1].selected=true;}
+function refreshGKSelectors(){updateSquadBadge();const c=gn('squadCount');let o='';for(let i=0;i<c;i++){if($('pavailbtn'+i)&&$('pavailbtn'+i).classList.contains('off'))continue;const n=gv('pname'+i);if(!n)continue;o+='<option value="'+esc(n)+'">'+esc(n)+'</option>';}$('gk1').innerHTML=o;$('gk2').innerHTML=o;if($('gk2').options.length>1)$('gk2').options[1].selected=true;}
 async function saveSquad(){const c=gn('squadCount');const s=[];for(let i=0;i<c;i++){s.push({name:gv('pname'+i),available:!($('pavailbtn'+i)&&$('pavailbtn'+i).classList.contains('off')),injured:!!($('pinjbtn'+i)&&$('pinjbtn'+i).classList.contains('on')),def:gc('p'+i+'_def'),midc:gc('p'+i+'_midc'),midw:gc('p'+i+'_midw'),att:gc('p'+i+'_att'),note:gv('pnote'+i)});}const all=await loadAllSquads();all[activeSquadIdx]=s;await saveAllSquads(all);showAlert('Squad saved!','success');}
 function collectPlayers(){const c=gn('squadCount');const p=[];for(let i=0;i<c;i++){if($('pavailbtn'+i)&&$('pavailbtn'+i).classList.contains('off'))continue;if($('pinjbtn'+i)&&$('pinjbtn'+i).classList.contains('on'))continue;const n=gv('pname'+i).trim();if(!n)continue;p.push({name:n,positions:{def:gc('p'+i+'_def'),midc:gc('p'+i+'_midc'),midw:gc('p'+i+'_midw'),att:gc('p'+i+'_att')},note:gv('pnote'+i),outfieldMins:0,totalMins:0});}return p;}
 
@@ -1481,14 +1483,14 @@ function renderPlanTable(){
       var subLines=blk.subs.filter(function(s){return s.off&&s.on;}).map(function(s){
         var op=prevPM[s.off.name]?' ('+prevPM[s.off.name]+')':'';
         var np=curPM[s.on.name]?' ('+curPM[s.on.name]+')':'';
-        return '<div style="padding:3px 0"><span class="sub-off">OUT: '+s.off.name+op+'</span><span style="color:var(--muted);font-size:11px"> &gt; </span><span class="sub-on">IN: '+s.on.name+np+'</span></div>';
+        return '<div style="padding:3px 0"><span class="sub-off">OUT: '+esc(s.off.name)+op+'</span><span style="color:var(--muted);font-size:11px"> &gt; </span><span class="sub-on">IN: '+esc(s.on.name)+np+'</span></div>';
       });
-      var posCh=blk.lineup.filter(function(p){return prev&&prev.lineup.includes(p)&&prevPM[p.name]&&curPM[p.name]&&prevPM[p.name]!==curPM[p.name];}).map(function(p){return p.name+': '+prevPM[p.name]+' > '+curPM[p.name];});
+      var posCh=blk.lineup.filter(function(p){return prev&&prev.lineup.includes(p)&&prevPM[p.name]&&curPM[p.name]&&prevPM[p.name]!==curPM[p.name];}).map(function(p){return esc(p.name)+': '+prevPM[p.name]+' > '+curPM[p.name];});
       subsHtml='<div style="margin-top:6px">'+subLines.join('');
       if(posCh.length)subsHtml+='<div style="margin-top:4px;font-size:12px;color:var(--muted)">Pos: '+posCh.join(' | ')+'</div>';
       subsHtml+='</div>';
     }
-    html+='<div class="plan-block"><div class="plan-time">'+timeLabel+'</div><div class="plan-names">'+blk.lineup.map(function(p){return p.name;}).join(' - ')+'</div>'+subsHtml+'<div style="color:var(--muted);font-size:11px;margin-top:4px">'+blk.dur+' mins (until '+blk.end+'\')</div></div>';
+    html+='<div class="plan-block"><div class="plan-time">'+timeLabel+'</div><div class="plan-names">'+blk.lineup.map(function(p){return esc(p.name);}).join(' - ')+'</div>'+subsHtml+'<div style="color:var(--muted);font-size:11px;margin-top:4px">'+blk.dur+' mins (until '+blk.end+'\')</div></div>';
   });
   $('planTable').innerHTML=html;
 }
@@ -1506,7 +1508,7 @@ function renderMinutesTable(){
     const dot=isGK?'<span style="color:var(--muted);font-size:11px">GK</span>':(ok?'<span style="color:#3ecf6c;font-size:11px">OK</span>':'<span style="color:var(--red);font-size:11px">!</span>');
     const debt=p.seasonDebt||0;
     const debtStr=debt>2?'<span style="font-size:10px;color:#f5a623;margin-left:3px">+'+Math.round(debt)+'</span>':'';
-    html+='<div class="mins-row"><div class="mins-name" title="'+p.name+'">'+p.name+debtStr+'</div><div class="mins-bar-wrap"><div class="mins-bar" style="width:'+pct+'%"></div></div><div style="font-size:11px;color:var(--muted);width:60px;text-align:right;flex-shrink:0">'+(isGK?shown+'\' field':shown+'\'')+'</div><div style="width:20px;text-align:center;flex-shrink:0">'+dot+'</div></div>';
+    html+='<div class="mins-row"><div class="mins-name" title="'+esc(p.name)+'">'+esc(p.name)+debtStr+'</div><div class="mins-bar-wrap"><div class="mins-bar" style="width:'+pct+'%"></div></div><div style="font-size:11px;color:var(--muted);width:60px;text-align:right;flex-shrink:0">'+(isGK?shown+'\' field':shown+'\'')+'</div><div style="width:20px;text-align:center;flex-shrink:0">'+dot+'</div></div>';
   });
   $('minutesTable').innerHTML=html;
 }
@@ -1517,7 +1519,7 @@ function renderSubList(){
   for(let i=Math.max(1,currentBlockIdx+1);i<blocks.length;i++){
     const blk=blocks[i];if(!blk.subs||!blk.subs.length)continue;
     const isHalf=Math.abs(blk.subAt-half)<0.5;
-    html+='<div class="sub-card"><div class="sub-card-time">At '+blk.subAt+'\''+( isHalf?' -- Halftime':'')+' </div>'+blk.subs.filter(function(s){return s.off&&s.on;}).map(function(s){return '<div style="display:flex;align-items:center;gap:6px;padding:2px 0"><span class="sub-off" style="font-size:13px">OUT: '+s.off.name+'</span><span style="color:var(--muted);font-size:12px"> > </span><span class="sub-on" style="font-size:13px">IN: '+s.on.name+'</span></div>';}).join('')+'</div>';
+    html+='<div class="sub-card"><div class="sub-card-time">At '+blk.subAt+'\''+( isHalf?' -- Halftime':'')+' </div>'+blk.subs.filter(function(s){return s.off&&s.on;}).map(function(s){return '<div style="display:flex;align-items:center;gap:6px;padding:2px 0"><span class="sub-off" style="font-size:13px">OUT: '+esc(s.off.name)+'</span><span style="color:var(--muted);font-size:12px"> > </span><span class="sub-on" style="font-size:13px">IN: '+esc(s.on.name)+'</span></div>';}).join('')+'</div>';
   }
   $('subList').innerHTML=html||'<p style="color:var(--muted);font-size:13px">No more substitutions</p>';
 }
@@ -1533,7 +1535,7 @@ function removeLastGoal(team){var t=team||'home';var idx=-1;for(var i=goalLog.le
 function openGoalModal(){
   $('goalMinute').value=Math.floor(elapsedSeconds/60)||'';
   const lineup=(planGenerated&&blocks[currentBlockIdx]&&blocks[currentBlockIdx].lineup)||playersData;
-  const opts=lineup.map(function(p){return '<option value="'+p.name+'">'+p.name+'</option>';}).join('');
+  const opts=lineup.map(function(p){return '<option value="'+esc(p.name)+'">'+esc(p.name)+'</option>';}).join('');
   $('goalScorer').innerHTML=opts;
   $('goalAssist').innerHTML='<option value="">None</option>'+opts;
   openModal('modal-goal');
@@ -1555,8 +1557,8 @@ function renderGoalLog(){
   $('goalLog').innerHTML=allGoals.map(function(g){
     const gi=goalLog.indexOf(g);
     var isHome=g.team==='home';
-    var assistPart=g.assist?'<span class="goal-assist"> Assist: '+g.assist+'</span>':'';
-    var scorerPart=isHome?(g.scorer||'?'):'<span style="color:var(--red)">Opponent</span>';
+    var assistPart=g.assist?'<span class="goal-assist"> Assist: '+esc(g.assist)+'</span>':'';
+    var scorerPart=isHome?esc(g.scorer||'?'):'<span style="color:var(--red)">Opponent</span>';
     var minStyle=isHome?'color:var(--amber)':'color:var(--red)';
     return '<div class="goal-entry"><span class="goal-min" style="'+minStyle+'">'+g.min+'\'</span><div style="flex:1"><span class="goal-scorer">'+scorerPart+'</span>'+assistPart+'</div><button class="goal-del" onclick="deleteGoal('+gi+')">x</button></div>';
   }).join('');
@@ -1576,7 +1578,8 @@ function forceNextBlock(){if(!planGenerated){showAlert('Generate a plan first');
 function updateNextChangeBar(){if(!blocks.length)return;const em=elapsedSeconds/60;const next=blocks.slice(1).find(function(b){return b.subAt>em+0.05;});if(next){const ml=Math.ceil(next.subAt-em);$('nextChangeValue').textContent=next.subAt+'\' (in ~'+ml+' min'+(ml!==1?'s':'')+')';}else $('nextChangeValue').textContent='No more changes';}
 
 /* INJURY */
-function buildInjuryList(){if(!planGenerated){$('injuryPlayerList').innerHTML='<p style="color:var(--muted);font-size:13px">Generate a plan first.</p>';return;}const onPitch=(blocks[currentBlockIdx]&&blocks[currentBlockIdx].lineup)||[];let html='';playersData.forEach(function(p){if(p.injured)return;const active=onPitch.includes(p);html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)"><span style="font-size:15px">'+p.name+(active?' (on pitch)':'')+'</span><button class="btn btn-danger btn-sm" onclick="markInjured(\''+p.name+'\')" style="width:auto">Injured</button></div>';});$('injuryPlayerList').innerHTML=html||'<p style="color:var(--muted);font-size:13px">No available players.</p>';}
+function buildInjuryList(){if(!planGenerated){$('injuryPlayerList').innerHTML='<p style="color:var(--muted);font-size:13px">Generate a plan first.</p>';return;}const onPitch=(blocks[currentBlockIdx]&&blocks[currentBlockIdx].lineup)||[];let html='';playersData.forEach(function(p,pi){if(p.injured)return;const active=onPitch.includes(p);html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)"><span style="font-size:15px">'+esc(p.name)+(active?' (on pitch)':'')+'</span><button class="btn btn-danger btn-sm" onclick="markInjuredAt('+pi+')" style="width:auto">Injured</button></div>';});$('injuryPlayerList').innerHTML=html||'<p style="color:var(--muted);font-size:13px">No available players.</p>';}
+function markInjuredAt(i){if(playersData[i])markInjured(playersData[i].name);}
 function markInjured(name){const p=playersData.find(function(q){return q.name===name;});if(!p)return;p.injured=true;const remaining=blocks.slice(currentBlockIdx+1);remaining.forEach(function(blk){if(blk.lineup.includes(p)){const bench=playersData.filter(function(q){return !q.injured&&!blk.lineup.includes(q);});if(bench.length){const repl=bench.slice().sort(function(a,b){return a.outfieldMins-b.outfieldMins;})[0];const idx=blk.lineup.indexOf(p);blk.lineup[idx]=repl;}else blk.lineup=blk.lineup.filter(function(q){return q!==p;});}});closeModal(null,'modal-injury');renderPlanTable();renderMinutesTable();renderSubList();showAlert(name+' removed from remaining plan','success');}
 
 /* SEASON STATS */
@@ -1595,7 +1598,7 @@ async function buildSeasonStats(){
     const diffStr=diff===0?'-':(diff<0?'<span style="color:#ff8080">'+diff+'</span>':'<span style="color:#3ecf6c">+'+diff+'</span>');
     const curStr=row.cur>0?' <span style="color:var(--amber);font-size:10px">(+'+row.cur+')</span>':'';
     var gkCell=(row.r.gkMins||0)>0?'<span style="color:var(--amber)">'+(row.r.gkMins||0)+'</span>':'<span style="color:var(--muted)">-</span>';
-    html+='<tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 4px;font-weight:600">'+row.name+curStr+'</td><td style="text-align:right;padding:7px 4px">'+row.r.matches+'</td><td style="text-align:right;padding:7px 4px;color:#ff8080">'+(row.r.missedMatches||0)+'</td><td style="text-align:right;padding:7px 4px">'+(row.r.actualMins+(row.r.gkOutfieldMins||0))+'</td><td style="text-align:right;padding:7px 4px">'+gkCell+'</td><td style="text-align:right;padding:7px 4px;color:#7a8694">'+(row.r.attributedMins||0)+'</td><td style="text-align:right;padding:7px 4px;font-weight:700">'+row.fair+'</td><td style="text-align:right;padding:7px 4px">'+diffStr+'</td><td style="text-align:right;padding:7px 4px;color:#3ecf6c;font-weight:700">'+(row.r.goals||0)+'</td><td style="text-align:right;padding:7px 4px;color:#7a8694">'+(row.r.assists||0)+'</td></tr>';
+    html+='<tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 4px;font-weight:600">'+esc(row.name)+curStr+'</td><td style="text-align:right;padding:7px 4px">'+row.r.matches+'</td><td style="text-align:right;padding:7px 4px;color:#ff8080">'+(row.r.missedMatches||0)+'</td><td style="text-align:right;padding:7px 4px">'+(row.r.actualMins+(row.r.gkOutfieldMins||0))+'</td><td style="text-align:right;padding:7px 4px">'+gkCell+'</td><td style="text-align:right;padding:7px 4px;color:#7a8694">'+(row.r.attributedMins||0)+'</td><td style="text-align:right;padding:7px 4px;font-weight:700">'+row.fair+'</td><td style="text-align:right;padding:7px 4px">'+diffStr+'</td><td style="text-align:right;padding:7px 4px;color:#3ecf6c;font-weight:700">'+(row.r.goals||0)+'</td><td style="text-align:right;padding:7px 4px;color:#7a8694">'+(row.r.assists||0)+'</td></tr>';
   });
   html+='</tbody></table></div>';
   $('seasonStatsList').innerHTML=html;
@@ -2065,7 +2068,7 @@ async function buildHistoryAnalysis(history){
       var gdStr=(gd>0?'+':'')+gd.toFixed(1);
       var gdCol=gd>0?'var(--green)':gd<0?'var(--red)':'var(--muted)';
       html+='<div class="analysis-row">'
-        +'<span style="font-weight:600;width:70px;flex-shrink:0">'+p.name+'</span>'
+        +'<span style="font-weight:600;width:70px;flex-shrink:0">'+esc(p.name)+'</span>'
         +'<div class="analysis-bar-wrap"><div class="analysis-bar" style="width:'+barW+'%;background:var(--amber)"></div></div>'
         +'<span style="color:var(--green);width:32px;text-align:right">'+p.avgGF.toFixed(1)+'</span>'
         +'<span style="color:var(--red);width:32px;text-align:right">'+p.avgGA.toFixed(1)+'</span>'
@@ -2080,7 +2083,7 @@ async function buildHistoryAnalysis(history){
   if(scorers.length){
     html+='<div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin:14px 0 8px">Top Scorers</div>';
     scorers.forEach(function(p){
-      html+='<div class="analysis-row"><span style="font-weight:600">'+p.name+'</span><span style="color:var(--amber);font-weight:700;font-size:16px">'+p.goals+' goal'+(p.goals!==1?'s':'')+'</span><span style="color:var(--muted)">'+p.assists+' assist'+(p.assists!==1?'s':'')+'</span></div>';
+      html+='<div class="analysis-row"><span style="font-weight:600">'+esc(p.name)+'</span><span style="color:var(--amber);font-weight:700;font-size:16px">'+p.goals+' goal'+(p.goals!==1?'s':'')+'</span><span style="color:var(--muted)">'+p.assists+' assist'+(p.assists!==1?'s':'')+'</span></div>';
     });
   }
 
@@ -2097,13 +2100,13 @@ function buildHistoryList(history){
     var dateStr=m.date?new Date(m.date+'T12:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'}):'';
     var goalDetail='';
     if(m.goals&&m.goals.length){
-      goalDetail='<div class="hist-detail">'+m.goals.map(function(g){return g.min+"'&nbsp;"+g.scorer+(g.assist?" ("+g.assist+")":"");}).join(' &nbsp;·&nbsp; ')+'</div>';
+      goalDetail='<div class="hist-detail">'+m.goals.map(function(g){return g.min+"'&nbsp;"+esc(g.scorer)+(g.assist?" ("+esc(g.assist)+")":"");}).join(' &nbsp;·&nbsp; ')+'</div>';
     }
     var idx=history.length-1-history.slice().reverse().indexOf(m);
     html+='<div class="hist-card">'
       +'<div style="display:flex;justify-content:space-between;align-items:center">'
       +'<div><div class="hist-result '+resultClass+'">'+m.scoreUs+' – '+m.scoreThem+'</div>'
-      +'<div class="hist-meta">vs '+m.opponent+'&nbsp;&nbsp;'+dateStr+'&nbsp;&nbsp;'+m.formation+'</div></div>'
+      +'<div class="hist-meta">vs '+esc(m.opponent)+'&nbsp;&nbsp;'+dateStr+'&nbsp;&nbsp;'+esc(m.formation)+'</div></div>'
       +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">'
       +'<span style="font-size:11px;font-weight:700;color:'+(m.scoreUs>m.scoreThem?'var(--green)':m.scoreUs<m.scoreThem?'var(--red)':'var(--amber)')+';">'+(m.scoreUs>m.scoreThem?'WIN':m.scoreUs<m.scoreThem?'LOSS':'DRAW')+'</span>'
       +'<div style="display:flex;gap:6px">'+'<button class="btn btn-secondary btn-sm" style="font-size:11px;padding:5px 10px" onclick="showHistoryReport('+m.id+')">Report</button>'+'<button class="btn btn-secondary btn-sm" style="font-size:11px;padding:5px 10px" onclick="openEditMatch('+m.id+')">Edit</button>'+'</div>'
@@ -2574,10 +2577,10 @@ function showLiveMatchView(lm){
 
   // Position-labelled lineup
   var dm = blk.displayMap || blk.roleMap || {};
-  var lineupStr = [blk.activeGK+'[GK]'].concat(
+  var lineupStr = [esc(blk.activeGK)+'[GK]'].concat(
     blk.lineup.filter(function(n){return n!==blk.activeGK;}).map(function(n){
       var ri=dm[n]; var pos=(ri!=null&&ri>=0)?(rl[roles[ri]]||roles[ri]):'?';
-      return n+'['+pos+']';
+      return esc(n)+'['+pos+']';
     })
   ).join(', ');
 
@@ -2588,7 +2591,7 @@ function showLiveMatchView(lm){
     subsHtml='<div style="font-size:12px;color:var(--muted);margin-top:8px">'
       +(isHalf?'<strong style="color:var(--amber)">HALF TIME</strong> ':'<strong>'+blk.subAt+"'</strong> ")
       +blk.subs.map(function(s){
-        return '<span style="color:var(--red)">OUT '+s.off+'</span> &rarr; <span style="color:var(--green)">IN '+s.on+'</span>';
+        return '<span style="color:var(--red)">OUT '+esc(s.off)+'</span> &rarr; <span style="color:var(--green)">IN '+esc(s.on)+'</span>';
       }).join(' &nbsp; ')+'</div>';
   }
 
@@ -2598,7 +2601,7 @@ function showLiveMatchView(lm){
     goalsHtml='<div style="font-size:12px;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">'
       +lm.goalLog.map(function(g){
         return g.team==='home'
-          ?'<span style="color:var(--green)">&#9917; '+g.min+"' "+g.scorer+(g.assist?' ('+g.assist+')':'')+'</span>'
+          ?'<span style="color:var(--green)">&#9917; '+g.min+"' "+esc(g.scorer)+(g.assist?' ('+esc(g.assist)+')':'')+'</span>'
           :'<span style="color:var(--red)">&#9917; '+g.min+"' Opp</span>";
       }).join(' &nbsp; ')+'</div>';
   }
@@ -2613,7 +2616,7 @@ function showLiveMatchView(lm){
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
       +'<div style="font-weight:800;font-size:16px;color:var(--amber)">&#9679; LIVE</div>'
       +'<div style="font-weight:800;font-size:22px">'+scoreStr+'</div>'
-      +'<div style="font-size:12px;color:var(--muted)">'+timeStr+' &middot; '+lm.formation+'</div>'
+      +'<div style="font-size:12px;color:var(--muted)">'+timeStr+' &middot; '+esc(lm.formation)+'</div>'
     +'</div>'
     +'<div style="font-size:13px;line-height:1.7;margin-bottom:8px">'+lineupStr+'</div>'
     +subsHtml+goalsHtml
