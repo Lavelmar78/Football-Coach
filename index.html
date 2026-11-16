@@ -265,7 +265,7 @@ select option{background:#252b33;}
   <div><div class="hdr-title">Assistant Manager</div><div class="hdr-sub">Match Manager</div></div>
   <div class="hdr-right">
     <span class="score-hdr" id="scoreHdr" onclick="openModal('modal-settings')">0 – 0</span>
-    <div class="hdr-badge">v3</div>
+    <div class="hdr-badge">v3.1</div>
   </div>
 </header>
 
@@ -799,8 +799,16 @@ async function upgradeTeamCode(){
     step='verifying the copy';
     // verify the copy before touching the old doc
     var check=await cloudLoadTeamDoc(newCode);
-    if(!check||stableStringify(check.history||[])!==stableStringify(copy.history||[])||stableStringify(check.season||{})!==stableStringify(copy.season||{})||stableStringify(check.squads||[])!==stableStringify(copy.squads||[])){
-      throw new Error('Copy could not be verified - nothing was changed');
+    var bad=[];
+    if(!check){ bad.push('new team not readable'); }
+    else{
+      [['history',[]],['season',{}],['squads',[]],['squad_names',[]]].forEach(function(pair){
+        var k=pair[0], a=stableStringify(check[k]===undefined?pair[1]:check[k]), b=stableStringify(copy[k]===undefined?pair[1]:copy[k]);
+        if(a!==b) bad.push(k+' ('+a.length+' vs '+b.length+' chars)');
+      });
+    }
+    if(bad.length){
+      throw new Error('Copy mismatch in '+bad.join(', ')+' - nothing was changed');
     }
     // retire the old doc (clear data, flag it)
     var retire={retired:true};
