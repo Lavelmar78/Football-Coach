@@ -760,6 +760,14 @@ async function createTeam(){
   }
 }
 
+/* JSON with object keys sorted, so two copies of the same data compare equal
+   even though Firestore returns fields in a different order. */
+function stableStringify(v){
+  if(v===null||typeof v!=='object') return JSON.stringify(v);
+  if(Array.isArray(v)) return '['+v.map(stableStringify).join(',')+']';
+  return '{'+Object.keys(v).sort().filter(function(k){return v[k]!==undefined;}).map(function(k){return JSON.stringify(k)+':'+stableStringify(v[k]);}).join(',')+'}';
+}
+
 /* Move the team to a new, strong code. The data is copied to the new doc,
    then the old doc is emptied and marked retired so the weak code is useless. */
 async function upgradeTeamCode(){
@@ -791,7 +799,7 @@ async function upgradeTeamCode(){
     step='verifying the copy';
     // verify the copy before touching the old doc
     var check=await cloudLoadTeamDoc(newCode);
-    if(!check||JSON.stringify(check.history||[])!==JSON.stringify(copy.history||[])||JSON.stringify(check.season||{})!==JSON.stringify(copy.season||{})){
+    if(!check||stableStringify(check.history||[])!==stableStringify(copy.history||[])||stableStringify(check.season||{})!==stableStringify(copy.season||{})||stableStringify(check.squads||[])!==stableStringify(copy.squads||[])){
       throw new Error('Copy could not be verified - nothing was changed');
     }
     // retire the old doc (clear data, flag it)
