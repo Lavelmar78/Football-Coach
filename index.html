@@ -15,7 +15,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
   import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
-  import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+  import { getFirestore, doc, getDoc, setDoc, onSnapshot, deleteField } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyCnmaLVueELlGHN6vRvQgFovCFqzqwRz4k",
@@ -31,7 +31,7 @@
   const db = getFirestore(fbApp);
 
   // Expose a minimal surface on window so the main (non-module) script can use it
-  window.__firebase = { auth, db, doc, getDoc, setDoc, onSnapshot, signInAnonymously };
+  window.__firebase = { auth, db, doc, getDoc, setDoc, onSnapshot, deleteField, signInAnonymously };
 
   // Sign in anonymously as soon as the page loads. This gives every device
   // a stable identity Firestore rules can check, without any login UI.
@@ -306,6 +306,8 @@ select option{background:#252b33;}
       <label class="field-label">Team</label>
       <div id="teamCodeBadge" style="font-size:13px;color:var(--muted);margin-bottom:8px"></div>
       <button class="btn btn-secondary btn-sm" style="width:100%" onclick="showSwitchTeamOption()">Switch Team</button>
+      <button class="btn btn-secondary btn-sm" id="btnUpgradeCode" style="width:100%;margin-top:6px;display:none" onclick="upgradeTeamCode()">Get a stronger team code</button>
+      <div id="upgradeCodeNote" style="font-size:12px;color:var(--muted);margin-top:4px;display:none"></div>
     </div>
     <div style="margin-bottom:10px">
       <label class="field-label">Saved Squads</label>
@@ -564,11 +566,20 @@ let TEAM_DOC_CACHE = {};        // in-memory cache of the team's Firestore doc
 let TEAM_UNSUB = null;          // Firestore realtime listener unsubscribe fn
 
 function generateTeamCode(){
+  // WORD-XXXXXX: word for readability, 6 random chars (no I/O/0/1) from the
+  // browser's secure random source. ~1 billion combinations per word.
   const words=['ROVE','WOLF','HAWK','LION','BEAR','FOX','TIGR','EAGL','PUMA','STAG'];
-  const word=words[Math.floor(Math.random()*words.length)];
-  const num=Math.floor(100+Math.random()*900);
-  return word+'-'+num;
+  const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const bytes=new Uint8Array(6);
+  (window.crypto||window.msCrypto).getRandomValues(bytes);
+  let tail='';
+  for(let i=0;i<6;i++) tail+=alphabet.charAt(bytes[i]%alphabet.length);
+  const wb=new Uint8Array(1);
+  (window.crypto||window.msCrypto).getRandomValues(wb);
+  return words[wb[0]%words.length]+'-'+tail;
 }
+
+function isLegacyTeamCode(code){ return /^[A-Z]+-[0-9]{3}$/.test(code||''); }
 
 /* Wait for the Firebase module script (deferred, runs after this script in
    some load orders) to finish setting up window.__firebase and signing in.
@@ -666,6 +677,11 @@ function startTeamSync(teamCode){
     TEAM_UNSUB=fb.onSnapshot(ref,function(snap){
       if(!snap.exists()) return;
       const newData=snap.data();
+      if(newData&&newData.retired&&teamCode===CURRENT_TEAM_CODE){
+        showAlert('Team code replaced - rejoin with the new code');
+        showSwitchTeamOption();
+        return;
+      }
       TEAM_DOC_CACHE=newData||{};
       // Re-render whichever screens are visible so changes from other
       // coaches show up without needing a manual refresh.
@@ -691,7 +707,7 @@ function switchGateTab(tab){
 }
 
 async function joinTeam(){
-  const code=document.getElementById('teamCodeInput').value.trim().toUpperCase();
+  const code=document.getElementById('teamCodeInput').value.replace(/\s+/g,'').toUpperCase();
   const statusEl=document.getElementById('gateJoinStatus');
   if(!code){ statusEl.textContent='Enter a team code'; return; }
   statusEl.textContent='Checking...';
@@ -699,6 +715,10 @@ async function joinTeam(){
     const doc=await cloudLoadTeamDoc(code);
     if(!doc){
       statusEl.textContent='Team code not found - check and try again';
+      return;
+    }
+    if(doc.retired){
+      statusEl.textContent='That code has been replaced - ask your head coach for the new one';
       return;
     }
     CURRENT_TEAM_CODE=code;
@@ -740,6 +760,57 @@ async function createTeam(){
   }
 }
 
+/* Move the team to a new, strong code. The data is copied to the new doc,
+   then the old doc is emptied and marked retired so the weak code is useless. */
+async function upgradeTeamCode(){
+  var btn=$('btnUpgradeCode');
+  if(!CURRENT_TEAM_CODE||!btn) return;
+  if(btn.dataset.confirm!=='yes'){
+    btn.dataset.confirm='yes';
+    btn.textContent='Tap again - other coaches must rejoin with the new code';
+    setTimeout(function(){if(btn){btn.dataset.confirm='';btn.textContent='Get a stronger team code';}},5000);
+    return;
+  }
+  btn.disabled=true;btn.textContent='Upgrading...';
+  try{
+    var fb=await fbReady();
+    var oldCode=CURRENT_TEAM_CODE;
+    var newCode=generateTeamCode();
+    var taken=await cloudLoadTeamDoc(newCode);
+    var tries=0;
+    while(taken&&tries<5){newCode=generateTeamCode();taken=await cloudLoadTeamDoc(newCode);tries++;}
+    var src=await cloudLoadTeamDoc(oldCode)||TEAM_DOC_CACHE;
+    var keys=['teamName','squads','squad_names','season','history','createdAt'];
+    var copy={};
+    keys.forEach(function(k){if(src[k]!==undefined)copy[k]=src[k];});
+    await cloudSaveTeamDoc(newCode,copy);
+    // verify the copy before touching the old doc
+    var check=await cloudLoadTeamDoc(newCode);
+    if(!check||JSON.stringify(check.history||[])!==JSON.stringify(copy.history||[])||JSON.stringify(check.season||{})!==JSON.stringify(copy.season||{})){
+      throw new Error('Copy could not be verified - nothing was changed');
+    }
+    // retire the old doc (clear data, flag it)
+    var retire={retired:true};
+    ['squads','squad_names','season','history','liveMatch','teamName'].forEach(function(k){retire[k]=fb.deleteField();});
+    if(TEAM_UNSUB){TEAM_UNSUB();TEAM_UNSUB=null;}
+    await cloudSaveTeamDoc(oldCode,retire);
+    CURRENT_TEAM_CODE=newCode;
+    localStorage.setItem('am_team_code',newCode);
+    TEAM_DOC_CACHE=check;
+    startTeamSync(newCode);
+    var badge=$('teamCodeBadge');
+    if(badge) badge.innerHTML='Connected: <strong style="color:var(--amber)">'+newCode+'</strong> &middot; shared with other coaches';
+    btn.style.display='none';
+    var note=$('upgradeCodeNote');
+    if(note){note.style.display='';note.textContent='New code: '+newCode+' - send it to the other coaches. The old code no longer works.';}
+    showAlert('New team code: '+newCode,'success');
+  }catch(e){
+    console.error('upgradeTeamCode failed',e);
+    showAlert('Upgrade failed: '+(e&&e.message?e.message:'try again'));
+    btn.disabled=false;btn.dataset.confirm='';btn.textContent='Get a stronger team code';
+  }
+}
+
 function useOfflineMode(){
   CURRENT_TEAM_CODE=null;
   localStorage.setItem('am_team_code','');
@@ -773,7 +844,8 @@ async function autoRejoinTeam(){
     loadingEl.querySelector('.gate-loading').textContent='Reconnecting to your team...';
     try{
       const doc=await cloudLoadTeamDoc(saved);
-      if(doc){
+      if(doc&&doc.retired){ localStorage.removeItem('am_team_code'); }
+      else if(doc){
         CURRENT_TEAM_CODE=saved;
         TEAM_DOC_CACHE=doc;
         startTeamSync(saved);
@@ -2539,6 +2611,8 @@ async function initAppAfterGate(){
       ? 'Connected: <strong style="color:var(--amber)">'+CURRENT_TEAM_CODE+'</strong> &middot; shared with other coaches'
       : 'This device only &middot; not shared with other coaches';
   }
+  var ub=$('btnUpgradeCode');
+  if(ub) ub.style.display=(CURRENT_TEAM_CODE&&isLegacyTeamCode(CURRENT_TEAM_CODE))?'':'none';
   buildFormationGrid();
   await buildSquadTabs();
   const saved=await activeSquad();
