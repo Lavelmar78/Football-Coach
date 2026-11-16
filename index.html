@@ -282,12 +282,12 @@ select option{background:#252b33;}
     <label class="toggle-row" for="gkMode"><input type="checkbox" id="gkMode" checked><span class="toggle-pill"></span><span class="toggle-label">GKs: full half goal + full half outfield</span></label>
     <label class="toggle-row" for="alertMode"><input type="checkbox" id="alertMode" checked><span class="toggle-pill"></span><span class="toggle-label">Vibrate &amp; beep 1 min before subs</span></label>
     <div style="margin-bottom:14px">
-      <label class="field-label">Max Sub Windows Per Half</label>
+      <label class="field-label">Sub Windows Per Half</label>
       <select id="maxSubWindows">
         <option value="1">1 — Halftime only (simplest)</option>
         <option value="2" selected>2 — Halftime + 1 mid-half break</option>
         <option value="3">3 — Halftime + 2 mid-half breaks</option>
-        <option value="4">4 — Maximum rotation</option>
+        <option value="4">4 — Most rotation</option>
       </select>
     </div>
     <div id="alertBox" class="alert"></div>
@@ -1062,7 +1062,9 @@ async function generatePlan(){
   function simSpread(segs){const N=allNonGK.length,acc=new Array(N).fill(0);for(let si=0;si<segs.length;si++){const order=[];for(let j=0;j<N;j++)order.push(j);order.sort(function(a,b){return acc[a]-acc[b];});for(let k=0;k<Math.min(poolSlots,N);k++)acc[order[k]]+=segs[si].dur;}return N?Math.max.apply(null,acc)-Math.min.apply(null,acc):0;}
   const maxSph=Math.max(1,Math.min(4,gn('maxSubWindows')||2));
   let sph=1,bestSp=Infinity,segsPerHalf=1;
-  for(;sph<=maxSph;sph++){const sp=simSpread(buildSegs(sph));if(sp<bestSp){bestSp=sp;segsPerHalf=sph;}if(sp<=1)break;}
+  // On a tie, prefer MORE windows (shorter spells on the bench). Before, the first
+  // fair-enough option won, so a squad of 12 always got halftime only.
+  for(;sph<=maxSph;sph++){const sp=simSpread(buildSegs(sph));if(sp<=bestSp){bestSp=sp;segsPerHalf=sph;}}
   const segments=buildSegs(segsPerHalf);
 
   function assignGKSegs(halfSegs,target){if(target<=0)return{};const sorted=halfSegs.slice().sort(function(a,b){return a.dur-b.dur;});const ids={};let rem=target;for(let i=0;i<sorted.length;i++){if(rem<=0)break;ids[sorted[i].subAt]=true;rem-=sorted[i].dur;}return ids;}
